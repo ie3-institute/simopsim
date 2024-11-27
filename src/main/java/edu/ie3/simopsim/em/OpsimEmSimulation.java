@@ -15,7 +15,6 @@ public class OpsimEmSimulation extends OpsimSimulation {
 
     private final ExtEmDataConnection extEmDataConnection;
 
-
     public OpsimEmSimulation(
             String urlToOpsim,
             Path mappingPath

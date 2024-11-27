@@ -35,8 +35,8 @@ public class SimonaProxy extends ConservativeSynchronizedProxy {
     private long lastTimeStep = 0L;
 
     private long initTimeStep = 0L;
-    private Set<Asset> readable = new TreeSet<>(new AssetComparator());
-    private Set<Asset> writable = new TreeSet<>(new AssetComparator());
+    private final Set<Asset> readable = new TreeSet<>(new AssetComparator());
+    private final Set<Asset> writable = new TreeSet<>(new AssetComparator());
 
     public DataQueueExtSimulationExtSimulator<ExtInputDataContainer> dataQueueOpsimToSimona;
     public DataQueueExtSimulationExtSimulator<ExtResultContainer> dataQueueSimonaToOpsim;
@@ -86,10 +86,8 @@ public class SimonaProxy extends ConservativeSynchronizedProxy {
             try {
                 OpSimDataModelFileDao opsFile = new OpSimDataModelFileDao();
                 ScenarioConfig scenarioConfig = opsFile.read(componentConfig);
-                Iterator var4 = scenarioConfig.getAssetOperator().iterator();
 
-                while(var4.hasNext()) {
-                    AssetOperator ao = (AssetOperator)var4.next();
+                for (AssetOperator ao : scenarioConfig.getAssetOperator()) {
                     if (ao.getAssetOperatorName().equals(this.getComponentName())) {
                         this.readable.addAll(ao.getReadableAssets());
                         this.writable.addAll(ao.getControlledAssets());
