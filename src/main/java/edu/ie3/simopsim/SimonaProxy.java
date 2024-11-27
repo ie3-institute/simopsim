@@ -15,16 +15,12 @@ import edu.ie3.datamodel.models.value.Value;
 import edu.ie3.simona.api.data.DataQueueExtSimulationExtSimulator;
 import edu.ie3.simona.api.data.ExtInputDataContainer;
 import edu.ie3.simona.api.data.results.ExtResultContainer;
-import edu.ie3.simona.api.simulation.mapping.ExtEntityMapping;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import javax.xml.bind.JAXBException;
 import java.io.IOException;
 import java.util.*;
-
-import static edu.ie3.simona.api.simulation.mapping.DataType.EXT_GRID_RESULT;
-import static edu.ie3.simona.api.simulation.mapping.DataType.EXT_PRIMARY_INPUT;
 
 /**
  * Class that extends the Proxy interface of OPSIM
