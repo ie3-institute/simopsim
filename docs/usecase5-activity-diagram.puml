@@ -1,0 +1,23 @@
+@startuml
+'https://plantuml.com/activity-diagram-beta
+
+start
+if (Regelbasierte Regelung?) then (ja)
+(A)
+else (nein)
+if (Zentrale Optimierung?) then (ja)
+else (nein)
+if (Dezentrale Optimierung) then
+:Sammle Input-Daten und sende sie an Subscribers;
+endif
+endif
+endif
+:Input-Daten (z.B. Wasserstoffbedarf);
+:Elektrolyseur;
+:Übergabe der Wirk- und Blindleistung;
+:Leistungsflussrechnung;
+:Übergabe der Knotenspannungen und Leitungsströme;
+:Monitoring in der Leitwarte;
+stop
+
+@enduml

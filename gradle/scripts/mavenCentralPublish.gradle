@@ -1,0 +1,110 @@
+/* Maven publish - start */
+task sourcesJar(type: Jar) {
+  archiveClassifier =  "sources"
+  from sourceSets.main.allJava
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+  archiveClassifier =  "javadoc"
+  from javadoc.destinationDir
+}
+
+
+if (project.hasProperty('user') && project.hasProperty('password') && project.hasProperty('deployVersion')) {
+
+  // snapshot version differs from normal version
+  String versionString = project.getProperty('deployVersion')
+
+  signing {
+    required { !versionString.endsWith('SNAPSHOT') }
+    if (required)
+      sign(publishing.publications)
+  }
+
+  publishing {
+    publications {
+      mavenJava(MavenPublication) {
+
+        versionMapping {
+          // resolves dynamic versioning to current version number
+          usage('java-api') {
+            fromResolutionOf('runtimeClasspath')
+          }
+          usage('java-runtime') {
+            fromResolutionResult()
+          }
+        }
+        pom {
+          description = 'API of the simona power system simulation model'
+          name = 'Simona API'
+          url = 'https:github.com/ie3-institute/simonaAPI'
+          organization {
+            name = 'Institute of Energy Systems, Energy Efficiency and Energy Economics (ie3)/TU Dortmund University'
+            url = 'https:www.ie3.tu-dortmund.de/'
+          }
+          issueManagement {
+            system = 'GitHub'
+            url = 'https:github.com/ie3-institute/simonaAPI/issues'
+          }
+          licenses {
+            license {
+              name = 'BSD 3-Clause License'
+              url = 'https:github.com/ie3-institute/simonaAPI/blob/master/LICENSE'
+            }
+          }
+          developers {
+            developer {
+              organization = "Institute of Energy Systems, Energy Efficiency and Energy Economics (ie3)/TU Dortmund University"
+              organizationUrl = "https:ie3.etit.tu-dortmund.de"
+            }
+          }
+          scm {
+            connection = 'scm:git:git:github.com/ie3-institute/simonaAPI.git'
+            developerConnection = 'scm:git:ssh:github.com:ie3-institute/simonaAPI.git'
+            url = 'https:github.com/ie3-institute/simonaAPI'
+          }
+        }
+
+        removeTestDependenciesFromPom(pom)
+        groupId group
+        artifactId 'simonaAPI'
+        version versionString
+
+        from components.java
+        artifact sourcesJar
+        artifact javadocJar
+      }
+    }
+    repositories {
+      maven {
+        def releasesRepoUrl = "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
+        def snapshotsRepoUrl = "https://s01.oss.sonatype.org/content/repositories/snapshots/"
+        url = versionString.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl
+        credentials {
+          username project.getProperty('user')
+          password project.getProperty('password')
+        }
+      }
+    }
+  }
+
+
+  model {
+    tasks.generatePomFileForMavenJavaPublication {
+      destination = file("$buildDir/generated-pom.xml")
+    }
+  }
+}
+
+def removeTestDependenciesFromPom(pom) {
+
+  pom.withXml {
+    def root = asNode()
+    // eliminate test-scoped dependencies (no need in maven central POMs)
+    root.dependencies.removeAll { dep ->
+      dep.scope == "test"
+    }
+  }
+}
+
+/* Maven publish - end */

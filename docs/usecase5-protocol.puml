@@ -1,0 +1,48 @@
+@startuml
+
+box "mosaik" #LightBlue
+participant Optimierer
+end box
+box "SIMONA" #LightBlue
+participant MarketService
+participant EmAgent
+participant PvAgent
+participant EvcsAgent
+participant StorageAgent
+participant LoadAgent
+participant NodeAgent
+participant LineAgent
+participant GridAgent
+participant GridOperatorAgent
+end box
+
+PvAgent -> EmAgent: FlexOptions(Pmin, Pref, Pmax)
+StorageAgent -> EmAgent: FlexOptions(Pmin, Pref, Pmax, StorageRelevantData)
+EvcsAgent -> EmAgent: FlexOptions(Pmin, Pref, Pmax, EvcsRelevantData)
+LoadAgent -> EmAgent: ActivePower(P)
+MarketService -> EmAgent: Preissignal p
+EmAgent -> Optimierer: OptimiererInput
+Optimierer -> Optimierer: Optimierung: min f(x)
+Optimierer -> EmAgent: SetPoints(List(P_i))
+EmAgent -> MarketService: Verkaufte Energie
+EmAgent -> PvAgent: SetPoint(P_Pv)
+EmAgent -> EvcsAgent: SetPoint(P_Evcs)
+EmAgent -> StorageAgent: SetPoint(P_Storage)
+EmAgent -> LoadAgent: SetPoint(P_Load)
+
+PvAgent -> GridAgent: ActivePower(P_Pv)
+EvcsAgent -> GridAgent: ActivePower(P_Evcs)
+StorageAgent -> GridAgent: ActivePower(P_Storage)
+LoadAgent -> GridAgent: ActivePower(P_Load)
+
+GridAgent -> GridAgent: Leistungsflussrechnung
+
+GridAgent -> LineAgent: Leitungsströme
+
+GridAgent -> NodeAgent: Knotenspannungen
+
+GridAgent -> GridOperatorAgent: Leitungsströme, Knotenspannungen
+GridOperatorAgent -> GridOperatorAgent: Engpassmanagement
+
+
+@enduml

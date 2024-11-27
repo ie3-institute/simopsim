@@ -1,0 +1,30 @@
+@startuml
+
+box "mosaik" #LightBlue
+participant mosaik_electrolyzer
+participant mosaik_monitor
+end box
+box "SIMONA" #LightBlue
+participant SIMONA_PvAgent
+participant SIMONA_LoadAgent
+participant SIMONA_LoadAgent_Electrolyzer
+participant SIMONA_NodeAgent
+participant SIMONA_LineAgent
+participant SIMONA_GridAgent
+end box
+
+mosaik_electrolyzer -> mosaik_electrolyzer: Berechnung der Wirk- und Blindleistung
+mosaik_electrolyzer -> SIMONA_LoadAgent_Electrolyzer: Übermittlung von P, Q
+SIMONA_PvAgent -> SIMONA_GridAgent: P, Q
+activate SIMONA_GridAgent
+SIMONA_LoadAgent -> SIMONA_GridAgent: P, Q
+SIMONA_LoadAgent_Electrolyzer -> SIMONA_GridAgent: P, Q
+SIMONA_GridAgent -> SIMONA_GridAgent: Leistungsflussrechnung
+SIMONA_GridAgent -> SIMONA_LineAgent: Leitungsströme
+SIMONA_GridAgent -> SIMONA_NodeAgent: Knotenspannungen
+deactivate SIMONA_GridAgent
+SIMONA_LineAgent -> mosaik_monitor: Imag, Iang
+SIMONA_NodeAgent -> mosaik_monitor: Umag, Uang
+mosaik_monitor -> mosaik_monitor: Anzeigen der Ergebnisse
+
+@enduml

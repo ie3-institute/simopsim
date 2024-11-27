@@ -1,0 +1,36 @@
+@startuml
+
+participant OpSim
+box "simopsim" #LightBlue
+participant OpSimProxy
+participant simonaAPI
+end box
+participant SIMONA
+
+== Setup / Initialisierung ==
+
+SIMONA -> simonaAPI: Initialisierung
+simonaAPI -> OpSimProxy: Konstruktion
+OpSimProxy --> simonaAPI: OpSimProxy
+simonaAPI -> OpSim: Verbindung zum OpSim-Message-Bus über Client
+
+... Initialisierung der SIMONA-Komponente ...
+
+
+== Simulation ==
+
+OpSim -> OpSimProxy: Aufruf von step() inkl. Input-Messages
+OpSimProxy --> OpSimProxy: Konvertierung der Input-OpSim-Messages zu Input-Daten
+OpSimProxy --> simonaAPI: Übermittlung der Input-Daten
+SIMONA -> simonaAPI: Aufruf von doPreActivity()
+simonaAPI --> SIMONA: Input-Daten
+SIMONA --> SIMONA: Verteilung der Input-Daten
+SIMONA -> SIMONA: Simulation im Multi-Agenten-System
+SIMONA -> simonaAPI: Aufruf von doPostActivity()
+simonaAPI -> SIMONA: Anfrage von Output-Daten
+SIMONA --> simonaAPI: Output-Daten
+simonaAPI --> OpSimProxy: Output-Daten
+OpSimProxy --> OpSimProxy: Konvertierung der Output-Daten zu OpSim-Messages
+OpSimProxy --> OpSim: Übermittlung der Output-OpSim-Messages
+
+@enduml
