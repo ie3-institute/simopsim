@@ -7,6 +7,8 @@ import edu.ie3.simona.api.data.results.ExtResultDataConnection;
 import edu.ie3.simona.api.simulation.ExtCoSimulation;
 import edu.ie3.simona.api.simulation.mapping.ExtEntityMapping;
 import edu.ie3.simona.api.simulation.mapping.ExtEntityMappingSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.file.Path;
 import java.util.Map;
@@ -14,18 +16,23 @@ import java.util.Optional;
 
 public abstract class OpsimSimulation extends ExtCoSimulation {
 
+    protected static final Logger log = LoggerFactory.getLogger(OpsimSimulation.class);
+
     protected final SimonaProxy simonaProxy;
 
     protected final ExtEntityMapping mapping;
 
+    protected final int stepSize;
+
     protected final ExtResultDataConnection extResultDataConnection;
 
     protected OpsimSimulation(String simulationName, Path mappingPath) {
-        this(simulationName, "SimonaProxy", mappingPath);
+        this(simulationName, "SimonaProxy", mappingPath, 900);
     }
 
-    protected OpsimSimulation(String simulationName, String extSimulatorName, Path mappingPath) {
+    protected OpsimSimulation(String simulationName, String extSimulatorName, Path mappingPath, int stepSize) {
         super(simulationName, extSimulatorName);
+        this.stepSize = stepSize;
 
         try {
             this.mapping = ExtEntityMappingSource.fromFile(mappingPath);
@@ -39,7 +46,7 @@ public abstract class OpsimSimulation extends ExtCoSimulation {
                 dataQueueSimonaApiToExtCoSimulator
         );
 
-        this.extResultDataConnection = buildResultConnection(mapping);
+        this.extResultDataConnection = buildResultConnection(mapping, log);
     }
 
     @Override
@@ -52,21 +59,21 @@ public abstract class OpsimSimulation extends ExtCoSimulation {
     protected Optional<Long> doActivity(long tick) {
         log.info("+++++ External simulation triggered for tick {} +++++", tick);
 
-        Optional<Long> nextTick = Optional.of(tick + deltaT);
+        long nextTick = tick + stepSize;
 
         try {
             ExtInputDataContainer rawEmData = simonaProxy.dataQueueOpsimToSimona.takeData();
             Map<String, Value> inputMap = rawEmData.getSimonaInputMap();
 
-            sendToSimona(tick, inputMap, nextTick);
+            sendToSimona(tick, inputMap, rawEmData.getMaybeNextTick());
 
-            sendDataToExt(extResultDataConnection, tick, nextTick);
+            sendDataToExt(extResultDataConnection, tick, Optional.of(nextTick), log);
 
             log.info("***** External simulation for tick {} completed. Next simulation tick = {} *****", tick, nextTick);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
-        return nextTick;
+        return Optional.of(nextTick);
     }
 
     protected abstract void sendToSimona(long tick, Map<String, Value> inputMap, Optional<Long> maybeNextTick);

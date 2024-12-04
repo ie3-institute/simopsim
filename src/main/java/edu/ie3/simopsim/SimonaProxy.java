@@ -169,7 +169,7 @@ public class SimonaProxy extends ConservativeSynchronizedProxy {
 
     // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-    protected  <T extends OpSimMessage> void sendToOpSim(
+    protected <T extends OpSimMessage> void sendToOpSim(
             List<T> inputFromComponent
     ) {
         if (inputFromComponent.isEmpty()) {

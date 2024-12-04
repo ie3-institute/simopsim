@@ -21,7 +21,7 @@ public class OpsimEmSimulation extends OpsimSimulation {
     ) {
         super("OpsimEmSimulation", mappingPath);
 
-        this.extEmDataConnection = buildEmConnection(mapping);
+        this.extEmDataConnection = buildEmConnection(mapping, log);
 
         SimopsimUtils.runSimopsim(simonaProxy, urlToOpsim);
         log.info("Connected to: {}", urlToOpsim);
@@ -29,7 +29,7 @@ public class OpsimEmSimulation extends OpsimSimulation {
 
     @Override
     protected void sendToSimona(long tick, Map<String, Value> inputMap, Optional<Long> maybeNextTick) {
-        sendEmDataToSimona(extEmDataConnection, tick, inputMap, maybeNextTick);
+        sendEmDataToSimona(extEmDataConnection, tick, inputMap, maybeNextTick, log);
     }
 
     @Override

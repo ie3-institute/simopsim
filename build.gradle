@@ -44,10 +44,6 @@ dependencies {
     implementation 'com.opencsv:opencsv:5.5.2'
     implementation 'tech.units:indriya:2.2' // quantities
 
-    /* Mosaik dependencies */
-    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: '2.9.9.3'
-    implementation 'com.googlecode.json-simple:json-simple:1.1.1'
-
     // ie³ internal repository
     implementation('com.github.ie3-institute:PowerSystemUtils:2.2.1') {
         exclude group: 'org.apache.logging.log4j'
@@ -61,14 +57,19 @@ dependencies {
         /* Exclude our own nested dependencies */
         exclude group: 'com.github.ie3-institute'
     }
-    implementation('com.github.ie3-institute:simonaAPI:0.4.0') {
+    implementation('com.github.ie3-institute:simonaAPI:0.6.0') {
         exclude group: 'org.apache.logging.log4j'
         exclude group: 'org.slf4j'
         /* Exclude our own nested dependencies */
         exclude group: 'edu.ie3'
     }
 
+    /* Mosaik dependencies */
+    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: '2.9.9.3'
+    implementation 'com.googlecode.json-simple:json-simple:1.1.1'
 
+    // opsim dependencies
+    implementation group: 'com.sun.xml.bind', name: 'jaxb-impl', version: '4.0.5'
     implementation files('libs/iee-opsim-datamodel-3.3.8.jar')
     implementation files('libs/iee-opsim-client-2.2.23-SNAPSHOT-jar-with-dependencies.jar')
 
@@ -85,6 +86,4 @@ dependencies {
     implementation "org.apache.pekko:pekko-actor-typed_${scalaVersion}:${pekkoVersion}"
     implementation "org.apache.pekko:pekko-slf4j_${scalaVersion}:${pekkoVersion}"
     //implementation "org.apache.pekko:pekko-connectors-csv_${scalaVersion}:${pekkoVersion}"
-
-
 }
