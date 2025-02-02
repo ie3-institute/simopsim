@@ -22,7 +22,7 @@ ext {
 }
 
 group = 'com.github.ie3-institute'
-description = 'simosaik'
+description = 'simopsim'
 
 java {
   sourceCompatibility = javaVersion
