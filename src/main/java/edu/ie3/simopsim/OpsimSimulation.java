@@ -68,10 +68,16 @@ public abstract class OpsimSimulation extends ExtCoSimulation {
 
     try {
       ExtInputDataContainer rawEmData = simonaProxy.dataQueueOpsimToSimona.takeData();
+      if (rawEmData.getTick() != tick) {
+        throw new RuntimeException(String.format("OpSim provided input data for tick %d, but SIMONA expects input data for tick %d", rawEmData.getTick(), tick));
+      }
       Map<String, Value> inputMap = rawEmData.getSimonaInputMap();
-
       sendToSimona(tick, inputMap, rawEmData.getMaybeNextTick());
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
+    }
 
+    try {
       sendDataToExt(extResultDataConnection, tick, Optional.of(nextTick), log);
 
       log.info(

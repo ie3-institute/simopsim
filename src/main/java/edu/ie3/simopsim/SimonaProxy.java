@@ -127,8 +127,8 @@ public class SimonaProxy extends ConservativeSynchronizedProxy {
       this.lastTimeStep = timeStep;
       try {
         logger.info("Received messages for " + this.cli.getCurrentSimulationTime().toString());
-        Map<String, Value> dataForSimona = SimopsimUtils.createInputMap(inputFromClient);
-        dataQueueOpsimToSimona.queueData(new ExtInputDataContainer(0L, dataForSimona));
+        Map<String, Value> dataForSimona = SimopsimUtils.createInputMap(inputFromClient, logger);
+        dataQueueOpsimToSimona.queueData(new ExtInputDataContainer((cli.getClock().getActualTime().getMillis() - this.initTimeStep)/1000, dataForSimona, (this.lastTimeStep - this.initTimeStep)/1000));
       } catch (InterruptedException e) {
         throw new RuntimeException(e);
       }

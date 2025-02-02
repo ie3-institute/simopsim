@@ -1,9 +1,3 @@
-/*
- * © 2024. TU Dortmund University,
- * Institute of Energy Systems, Energy Efficiency and Energy Economics,
- * Research group Distribution grid planning and operation
- */
-
 package edu.ie3.simopsim;
 
 import de.fhg.iwes.opsim.datamodel.generated.asset.Asset;
@@ -12,6 +6,7 @@ import de.fhg.iwes.opsim.datamodel.generated.realtimedata.*;
 import edu.ie3.datamodel.models.StandardUnits;
 import edu.ie3.datamodel.models.value.PValue;
 import edu.ie3.datamodel.models.value.Value;
+import edu.ie3.simona.api.data.em.NoSetPointValue;
 import edu.ie3.simona.api.data.results.ExtResultContainer;
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -21,6 +16,7 @@ import java.util.*;
 import java.util.concurrent.TimeoutException;
 import org.joda.time.DateTime;
 import tech.units.indriya.quantity.Quantities;
+import org.apache.logging.log4j.Logger;
 
 /** Helpful methods to implement a SIMONA-OPSIM coupling. */
 public class SimopsimUtils {
@@ -116,23 +112,42 @@ public class SimopsimUtils {
     return new OpSimAggregatedSetPoints(asset.getGridAssetId(), delta, osmSetPoints);
   }
 
-  public static Map<String, Value> createInputMap(Queue<OpSimMessage> inputFromClient) {
-    Map<String, Value> dataForSimona = new HashMap<>();
-
-    inputFromClient.forEach(
-        osm -> {
-          if (osm instanceof OpSimScheduleMessage ossm) {
-            for (OpSimScheduleElement ose : ossm.getScheduleElements()) {
-              if (ose.getScheduledValueType() == SetPointValueType.ACTIVE_POWER) {
-                dataForSimona.put(
-                    ossm.getAssetId(),
-                    new PValue(
-                        Quantities.getQuantity(
-                            ose.getScheduledValue(), StandardUnits.ACTIVE_POWER_IN)));
-              }
-            }
-          }
-        });
+  public static Map<String, Value> createInputMap(
+          Queue<OpSimMessage> inputFromClient,
+          Logger logger
+  ) {
+      Map<String, Value> dataForSimona = new HashMap<>();
+      inputFromClient.forEach(
+            osm -> {
+                if (osm instanceof OpSimScheduleMessage ossm) {
+                    logger.info("OpSimScheduleMessage: " + ossm);
+                    double switchPosition = 0.0;
+                    double activePower = 0.0;
+                    for (OpSimScheduleElement ose : ossm.getScheduleElements()) {
+                        if (ose.getScheduledValueType() == SetPointValueType.SWITCH_POSITION) {
+                            switchPosition = ose.getScheduledValue();
+                        } else if (ose.getScheduledValueType() == SetPointValueType.ACTIVE_POWER) {
+                            activePower = ose.getScheduledValue();
+                        }
+                    }
+                    PValue opsimValue;
+                    if (Double.isNaN(switchPosition) || Double.isNaN(activePower)) {
+                        logger.info("[{}] Received invalid data because of communication problems!", ossm.getAssetId());
+                        opsimValue = new NoSetPointValue(Quantities.getQuantity(0.0, StandardUnits.ACTIVE_POWER_IN));
+                    } else {
+                        if (switchPosition == 1.0) {
+                            logger.info("[{}] Control Signal from Netzbetrieb because of congestions!", ossm.getAssetId());
+                            opsimValue = new PValue(Quantities.getQuantity(activePower, StandardUnits.ACTIVE_POWER_IN));
+                        } else { //No Control Signal from Netzbetrieb
+                            opsimValue = new NoSetPointValue(Quantities.getQuantity(activePower, StandardUnits.ACTIVE_POWER_IN));
+                        }
+                    }
+                    dataForSimona.put(
+                            ossm.getAssetId(),
+                            opsimValue
+                    );
+                }
+            });
 
     return new HashMap<>(dataForSimona);
   }
