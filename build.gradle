@@ -2,7 +2,6 @@ import com.github.jengelman.gradle.plugins.shadow.transformers.AppendingTransfor
 
 plugins {
   id 'java' // java support
-  id 'scala' // scala support
   id 'maven-publish' // publish to a maven repo (local or mvn central, has to be defined)
   id "com.github.johnrengelman.shadow" version "8.1.1"
   id 'com.diffplug.spotless' version '6.25.0'// code format
@@ -53,13 +52,13 @@ dependencies {
     /* Exclude our own nested dependencies */
     exclude group: 'com.github.ie3-institute'
   }
-  implementation('com.github.ie3-institute:PowerSystemDataModel:5.1.0') {
+  implementation('com.github.ie3-institute:PowerSystemDataModel:6.0.0') {
     exclude group: 'org.apache.logging.log4j'
     exclude group: 'org.slf4j'
     /* Exclude our own nested dependencies */
     exclude group: 'com.github.ie3-institute'
   }
-  implementation('com.github.ie3-institute:simonaAPI:0.6.0') {
+  implementation('com.github.ie3-institute:simonaAPI:0.8.0') {
     exclude group: 'org.apache.logging.log4j'
     exclude group: 'org.slf4j'
     /* Exclude our own nested dependencies */

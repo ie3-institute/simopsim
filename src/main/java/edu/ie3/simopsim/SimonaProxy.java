@@ -16,15 +16,17 @@ import de.fhg.iwes.opsim.datamodel.generated.assetoperator.AssetOperator;
 import de.fhg.iwes.opsim.datamodel.generated.realtimedata.OpSimAggregatedSetPoints;
 import de.fhg.iwes.opsim.datamodel.generated.realtimedata.OpSimMessage;
 import de.fhg.iwes.opsim.datamodel.generated.scenarioconfig.ScenarioConfig;
-import edu.ie3.datamodel.models.value.Value;
-import edu.ie3.simona.api.data.DataQueueExtSimulationExtSimulator;
-import edu.ie3.simona.api.data.ExtInputDataContainer;
-import edu.ie3.simona.api.data.results.ExtResultContainer;
-import java.io.IOException;
-import java.util.*;
-import javax.xml.bind.JAXBException;
+import edu.ie3.datamodel.models.value.PValue;
+import edu.ie3.simona.api.data.ExtDataContainerQueue;
+import edu.ie3.simona.api.data.container.ExtInputDataContainer;
+import edu.ie3.simona.api.data.container.ExtResultContainer;
+import edu.ie3.simona.api.data.mapping.ExtEntityMapping;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+
+import javax.xml.bind.JAXBException;
+import java.io.IOException;
+import java.util.*;
 
 /** Class that extends the Proxy interface of OPSIM */
 public class SimonaProxy extends ConservativeSynchronizedProxy {
@@ -40,8 +42,9 @@ public class SimonaProxy extends ConservativeSynchronizedProxy {
   private final Set<Asset> readable = new TreeSet<>(new AssetComparator());
   private final Set<Asset> writable = new TreeSet<>(new AssetComparator());
 
-  public DataQueueExtSimulationExtSimulator<ExtInputDataContainer> dataQueueOpsimToSimona;
-  public DataQueueExtSimulationExtSimulator<ExtResultContainer> dataQueueSimonaToOpsim;
+  public ExtDataContainerQueue<ExtInputDataContainer> queueToSIMONA;
+  public ExtDataContainerQueue<ExtResultContainer> queueToOpSim;
+  private ExtEntityMapping mapping;
 
   public SimonaProxy() {
     try {
@@ -59,10 +62,12 @@ public class SimonaProxy extends ConservativeSynchronizedProxy {
   }
 
   public void setConnectionToSimonaApi(
-      DataQueueExtSimulationExtSimulator<ExtInputDataContainer> dataQueueExtCoSimulatorToSimonaApi,
-      DataQueueExtSimulationExtSimulator<ExtResultContainer> dataQueueSimonaApiToExtCoSimulator) {
-    this.dataQueueOpsimToSimona = dataQueueExtCoSimulatorToSimonaApi;
-    this.dataQueueSimonaToOpsim = dataQueueSimonaApiToExtCoSimulator;
+          ExtDataContainerQueue<ExtInputDataContainer> queueToSIMONA,
+          ExtDataContainerQueue<ExtResultContainer> queueToOpSim,
+          ExtEntityMapping mapping) {
+    this.queueToSIMONA = queueToSIMONA;
+    this.queueToOpSim = queueToOpSim;
+    this.mapping = mapping;
   }
 
   @Override
@@ -127,8 +132,10 @@ public class SimonaProxy extends ConservativeSynchronizedProxy {
       this.lastTimeStep = timeStep;
       try {
         logger.info("Received messages for " + this.cli.getCurrentSimulationTime().toString());
-        Map<String, Value> dataForSimona = SimopsimUtils.createInputMap(inputFromClient);
-        dataQueueOpsimToSimona.queueData(new ExtInputDataContainer(0L, dataForSimona));
+        Map<UUID, PValue> dataForSimona = SimopsimUtils.createEmSetPointMap(inputFromClient, mapping);
+        ExtInputDataContainer inputDataContainer = new ExtInputDataContainer(0L);
+        dataForSimona.forEach(inputDataContainer::addSetPoint);
+        queueToSIMONA.queueData(inputDataContainer);
       } catch (InterruptedException e) {
         throw new RuntimeException(e);
       }
@@ -140,14 +147,14 @@ public class SimonaProxy extends ConservativeSynchronizedProxy {
       try {
         logger.info("Wait for results from SIMONA!");
         // Wait for results from SIMONA!
-        ExtResultContainer results = dataQueueSimonaToOpsim.takeData();
+        ExtResultContainer results = queueToOpSim.takeAll();
         logger.info("Received results from SIMONA!");
 
         logger.debug(
             "Send Aggregated SetPoints for " + this.cli.getCurrentSimulationTime().toString());
         List<OpSimAggregatedSetPoints> osmAggSetPoints =
             SimopsimUtils.createSimopsimOutputList(
-                writable, cli.getClock().getActualTime().plus(delta).getMillis(), results);
+                writable, cli.getClock().getActualTime().plus(delta).getMillis(), results, mapping);
 
         printMsg(osmAggSetPoints);
         sendToOpSim(osmAggSetPoints);

@@ -11,13 +11,13 @@ import edu.ie3.simona.api.exceptions.NoExtSimulationException;
 import edu.ie3.simona.api.simulation.ExtSimAdapterData;
 import edu.ie3.simona.api.simulation.ExtSimulation;
 import edu.ie3.simopsim.config.ArgsParser;
-import edu.ie3.simopsim.em.OpsimEmSimulation;
+
 import java.nio.file.Path;
 import java.util.Optional;
 
 public class SimopsimExtLink implements ExtLinkInterface {
 
-  OpsimEmSimulation emSimulation;
+  OpsimSimulation emSimulation;
 
   @Override
   public ExtSimulation getExtSimulation() {
@@ -36,7 +36,7 @@ public class SimopsimExtLink implements ExtLinkInterface {
     Optional<Path> mappingPath = arguments.mappingPath();
 
     if (urlToOpsim.isPresent() && mappingPath.isPresent()) {
-      emSimulation = new OpsimEmSimulation(urlToOpsim.get(), mappingPath.get());
+      emSimulation = new OpsimSimulation("SIMONA Simulation", urlToOpsim.get(), mappingPath.get());
       emSimulation.setAdapterData(data);
     }
   }
