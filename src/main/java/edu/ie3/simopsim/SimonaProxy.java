@@ -21,12 +21,11 @@ import edu.ie3.simona.api.data.ExtDataContainerQueue;
 import edu.ie3.simona.api.data.container.ExtInputDataContainer;
 import edu.ie3.simona.api.data.container.ExtResultContainer;
 import edu.ie3.simona.api.data.mapping.ExtEntityMapping;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
-import javax.xml.bind.JAXBException;
 import java.io.IOException;
 import java.util.*;
+import javax.xml.bind.JAXBException;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /** Class that extends the Proxy interface of OPSIM */
 public class SimonaProxy extends ConservativeSynchronizedProxy {
@@ -62,9 +61,9 @@ public class SimonaProxy extends ConservativeSynchronizedProxy {
   }
 
   public void setConnectionToSimonaApi(
-          ExtDataContainerQueue<ExtInputDataContainer> queueToSIMONA,
-          ExtDataContainerQueue<ExtResultContainer> queueToOpSim,
-          ExtEntityMapping mapping) {
+      ExtDataContainerQueue<ExtInputDataContainer> queueToSIMONA,
+      ExtDataContainerQueue<ExtResultContainer> queueToOpSim,
+      ExtEntityMapping mapping) {
     this.queueToSIMONA = queueToSIMONA;
     this.queueToOpSim = queueToOpSim;
     this.mapping = mapping;
@@ -132,7 +131,8 @@ public class SimonaProxy extends ConservativeSynchronizedProxy {
       this.lastTimeStep = timeStep;
       try {
         logger.info("Received messages for " + this.cli.getCurrentSimulationTime().toString());
-        Map<UUID, PValue> dataForSimona = SimopsimUtils.createEmSetPointMap(inputFromClient, mapping);
+        Map<UUID, PValue> dataForSimona =
+            SimopsimUtils.createEmSetPointMap(inputFromClient, mapping);
         ExtInputDataContainer inputDataContainer = new ExtInputDataContainer(0L);
         dataForSimona.forEach(inputDataContainer::addSetPoint);
         queueToSIMONA.queueData(inputDataContainer);

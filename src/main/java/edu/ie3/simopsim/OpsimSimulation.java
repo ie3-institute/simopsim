@@ -7,22 +7,21 @@
 package edu.ie3.simopsim;
 
 import edu.ie3.datamodel.exceptions.SourceException;
-import edu.ie3.datamodel.models.value.PValue;
 import edu.ie3.simona.api.data.ExtDataConnection;
 import edu.ie3.simona.api.data.container.ExtInputDataContainer;
 import edu.ie3.simona.api.data.em.EmMode;
 import edu.ie3.simona.api.data.em.ExtEmDataConnection;
+import edu.ie3.simona.api.data.em.model.EmSetPoint;
 import edu.ie3.simona.api.data.mapping.DataType;
 import edu.ie3.simona.api.data.mapping.ExtEntityEntry;
 import edu.ie3.simona.api.data.mapping.ExtEntityMapping;
 import edu.ie3.simona.api.data.mapping.ExtEntityMappingSource;
 import edu.ie3.simona.api.data.results.ExtResultDataConnection;
 import edu.ie3.simona.api.simulation.ExtCoSimulation;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.nio.file.Path;
 import java.util.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class OpsimSimulation extends ExtCoSimulation {
 
@@ -42,7 +41,11 @@ public class OpsimSimulation extends ExtCoSimulation {
   }
 
   protected OpsimSimulation(
-      String simulationName, String extSimulatorName, String urlToOpsim, Path mappingPath, int stepSize) {
+      String simulationName,
+      String extSimulatorName,
+      String urlToOpsim,
+      Path mappingPath,
+      int stepSize) {
     super(simulationName, extSimulatorName);
     this.stepSize = stepSize;
 
@@ -52,15 +55,26 @@ public class OpsimSimulation extends ExtCoSimulation {
       throw new RuntimeException(e);
     }
 
-    this.extEmDataConnection = buildEmConnection(mapping.getEntries(DataType.EXT_EM_INPUT).stream().map(ExtEntityEntry::uuid).toList(), EmMode.SET_POINT, log);
+    this.extEmDataConnection =
+        buildEmConnection(
+            mapping.getEntries(DataType.EXT_EM_INPUT).stream().map(ExtEntityEntry::uuid).toList(),
+            EmMode.BASE,
+            log);
 
     this.simonaProxy = new SimonaProxy();
     simonaProxy.setConnectionToSimonaApi(queueToSimona, queueToExt, mapping);
 
     Map<DataType, List<UUID>> map = new HashMap<>();
-    List<UUID> participantResults = mapping.getEntries(DataType.EXT_PARTICIPANT_RESULT).stream().map(ExtEntityEntry::uuid).toList();
-    List<UUID> gridResults = mapping.getEntries(DataType.EXT_GRID_RESULT).stream().map(ExtEntityEntry::uuid).toList();
-    List<UUID> flexResults = mapping.getEntries(DataType.EXT_FLEX_OPTIONS_RESULT).stream().map(ExtEntityEntry::uuid).toList();
+    List<UUID> participantResults =
+        mapping.getEntries(DataType.EXT_PARTICIPANT_RESULT).stream()
+            .map(ExtEntityEntry::uuid)
+            .toList();
+    List<UUID> gridResults =
+        mapping.getEntries(DataType.EXT_GRID_RESULT).stream().map(ExtEntityEntry::uuid).toList();
+    List<UUID> flexResults =
+        mapping.getEntries(DataType.EXT_FLEX_OPTIONS_RESULT).stream()
+            .map(ExtEntityEntry::uuid)
+            .toList();
 
     map.put(DataType.EXT_PARTICIPANT_RESULT, participantResults);
     map.put(DataType.EXT_GRID_RESULT, gridResults);
@@ -95,9 +109,9 @@ public class OpsimSimulation extends ExtCoSimulation {
 
       Optional<Long> maybeNextTick = container.getMaybeNextTick();
 
-      Map<UUID, PValue> emData = container.extractSetPoints();
+      Map<UUID, EmSetPoint> emSetPoints = container.extractSetPoints();
 
-      sendEmSetPointsToSimona(extEmDataConnection, tick, emData, maybeNextTick, log);
+      sendEmSetPointsToSimona(extEmDataConnection, tick, emSetPoints, maybeNextTick, log);
 
       sendResultToExt(extResultDataConnection, tick, Optional.of(nextTick), log);
 
