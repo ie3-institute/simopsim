@@ -46,10 +46,10 @@ public class ArgsParser {
       throw new RuntimeException("No value found for required element --config!");
     }
 
-    SimopsimConfig config = new SimopsimConfig(ConfigFactory.parseFile(new File(value)));
+    SimopsimConfig config = SimopsimConfig.from(ConfigFactory.parseFile(new File(value)));
 
-    Optional<String> urlToOpsim = Optional.ofNullable(config.simopsim.urlToOpsim);
-    Optional<Path> mappingPath = Optional.ofNullable(config.simopsim.mappingPath).map(Path::of);
+    Optional<String> urlToOpsim = config.urlToOpsim();
+    Optional<Path> mappingPath = config.mappingPath();
 
     return new Arguments(args, urlToOpsim, mappingPath);
   }
