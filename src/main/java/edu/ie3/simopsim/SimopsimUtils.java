@@ -14,6 +14,7 @@ import edu.ie3.datamodel.models.result.ResultEntity;
 import edu.ie3.datamodel.models.result.system.SystemParticipantResult;
 import edu.ie3.datamodel.models.value.PValue;
 import edu.ie3.simona.api.data.container.ExtResultContainer;
+import edu.ie3.simona.api.data.em.model.EmSetPoint;
 import edu.ie3.simona.api.data.mapping.ExtEntityMapping;
 import edu.ie3.util.quantities.PowerSystemUnits;
 import java.io.IOException;
@@ -131,9 +132,9 @@ public class SimopsimUtils {
     return new OpSimAggregatedSetPoints(asset.getGridAssetId(), delta, osmSetPoints);
   }
 
-  public static Map<UUID, PValue> createEmSetPointMap(
+  public static List<EmSetPoint> createEmSetPoints(
       Queue<OpSimMessage> inputFromClient, ExtEntityMapping mapping) {
-    Map<UUID, PValue> dataForSimona = new HashMap<>();
+    List<EmSetPoint> dataForSimona = new ArrayList<>();
     Map<String, UUID> idToUuid = mapping.getFullMapping();
 
     inputFromClient.forEach(
@@ -141,17 +142,19 @@ public class SimopsimUtils {
           if (osm instanceof OpSimScheduleMessage ossm) {
             for (OpSimScheduleElement ose : ossm.getScheduleElements()) {
               if (ose.getScheduledValueType() == SetPointValueType.ACTIVE_POWER) {
-                dataForSimona.put(
-                    idToUuid.get(ossm.getAssetId()),
-                    new PValue(
-                        Quantities.getQuantity(
-                            ose.getScheduledValue(), StandardUnits.ACTIVE_POWER_IN)));
+
+                dataForSimona.add(
+                    EmSetPoint.from(
+                        idToUuid.get(ossm.getAssetId()),
+                        new PValue(
+                            Quantities.getQuantity(
+                                ose.getScheduledValue(), StandardUnits.ACTIVE_POWER_IN))));
               }
             }
           }
         });
 
-    return new HashMap<>(dataForSimona);
+    return dataForSimona;
   }
 
   public static List<OpSimAggregatedSetPoints> createSimopsimOutputList(
