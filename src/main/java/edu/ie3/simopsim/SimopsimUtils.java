@@ -14,8 +14,8 @@ import edu.ie3.datamodel.models.result.ResultEntity;
 import edu.ie3.datamodel.models.result.system.SystemParticipantResult;
 import edu.ie3.datamodel.models.value.PValue;
 import edu.ie3.simona.api.data.container.ExtResultContainer;
-import edu.ie3.simona.api.data.em.model.EmSetPoint;
-import edu.ie3.simona.api.data.mapping.ExtEntityMapping;
+import edu.ie3.simona.api.data.model.em.EmSetPoint;
+import edu.ie3.simona.api.mapping.ExtEntityMapping;
 import edu.ie3.util.quantities.PowerSystemUnits;
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -104,7 +104,7 @@ public class SimopsimUtils {
       ExtResultContainer container, Asset asset, Long delta, ExtEntityMapping mapping) {
     List<OpSimSetPoint> osmSetPoints = new ArrayList<>(Collections.emptyList());
 
-    Map<String, UUID> idToUuid = mapping.getFullMapping();
+    Map<String, UUID> idToUuid = mapping.getExtId2UuidMapping();
 
     String gridId = asset.getGridAssetId();
     UUID id = idToUuid.get(gridId);
@@ -135,7 +135,7 @@ public class SimopsimUtils {
   public static List<EmSetPoint> createEmSetPoints(
       Queue<OpSimMessage> inputFromClient, ExtEntityMapping mapping) {
     List<EmSetPoint> dataForSimona = new ArrayList<>();
-    Map<String, UUID> idToUuid = mapping.getFullMapping();
+    Map<String, UUID> idToUuid = mapping.getExtId2UuidMapping();
 
     inputFromClient.forEach(
         osm -> {
@@ -144,7 +144,7 @@ public class SimopsimUtils {
               if (ose.getScheduledValueType() == SetPointValueType.ACTIVE_POWER) {
 
                 dataForSimona.add(
-                    EmSetPoint.from(
+                    new EmSetPoint(
                         idToUuid.get(ossm.getAssetId()),
                         new PValue(
                             Quantities.getQuantity(

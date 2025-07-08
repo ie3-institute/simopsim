@@ -17,10 +17,10 @@ import de.fhg.iwes.opsim.datamodel.generated.realtimedata.OpSimAggregatedSetPoin
 import de.fhg.iwes.opsim.datamodel.generated.realtimedata.OpSimMessage;
 import de.fhg.iwes.opsim.datamodel.generated.scenarioconfig.ScenarioConfig;
 import edu.ie3.simona.api.data.ExtDataContainerQueue;
-import edu.ie3.simona.api.data.container.ExtInputDataContainer;
+import edu.ie3.simona.api.data.container.ExtInputContainer;
 import edu.ie3.simona.api.data.container.ExtResultContainer;
-import edu.ie3.simona.api.data.em.model.EmSetPoint;
-import edu.ie3.simona.api.data.mapping.ExtEntityMapping;
+import edu.ie3.simona.api.data.model.em.EmSetPoint;
+import edu.ie3.simona.api.mapping.ExtEntityMapping;
 import java.io.IOException;
 import java.util.List;
 import java.util.Queue;
@@ -44,7 +44,7 @@ public class SimonaProxy extends ConservativeSynchronizedProxy {
   private final Set<Asset> readable = new TreeSet<>(new AssetComparator());
   private final Set<Asset> writable = new TreeSet<>(new AssetComparator());
 
-  public ExtDataContainerQueue<ExtInputDataContainer> queueToSIMONA;
+  public ExtDataContainerQueue<ExtInputContainer> queueToSIMONA;
   public ExtDataContainerQueue<ExtResultContainer> queueToOpSim;
   private ExtEntityMapping mapping;
 
@@ -64,7 +64,7 @@ public class SimonaProxy extends ConservativeSynchronizedProxy {
   }
 
   public void setConnectionToSimonaApi(
-      ExtDataContainerQueue<ExtInputDataContainer> queueToSIMONA,
+      ExtDataContainerQueue<ExtInputContainer> queueToSIMONA,
       ExtDataContainerQueue<ExtResultContainer> queueToOpSim,
       ExtEntityMapping mapping) {
     this.queueToSIMONA = queueToSIMONA;
@@ -135,7 +135,7 @@ public class SimonaProxy extends ConservativeSynchronizedProxy {
       try {
         logger.info("Received messages for " + this.cli.getCurrentSimulationTime().toString());
         List<EmSetPoint> dataForSimona = SimopsimUtils.createEmSetPoints(inputFromClient, mapping);
-        ExtInputDataContainer inputDataContainer = new ExtInputDataContainer(0L);
+        ExtInputContainer inputDataContainer = new ExtInputContainer(0L);
         dataForSimona.forEach(inputDataContainer::addSetPoint);
         queueToSIMONA.queueData(inputDataContainer);
       } catch (InterruptedException e) {
@@ -149,7 +149,7 @@ public class SimonaProxy extends ConservativeSynchronizedProxy {
       try {
         logger.info("Wait for results from SIMONA!");
         // Wait for results from SIMONA!
-        ExtResultContainer results = queueToOpSim.takeAll();
+        ExtResultContainer results = queueToOpSim.takeContainer();
         logger.info("Received results from SIMONA!");
 
         logger.debug(

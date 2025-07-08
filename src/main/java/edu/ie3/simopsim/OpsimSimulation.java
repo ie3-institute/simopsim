@@ -7,17 +7,17 @@
 package edu.ie3.simopsim;
 
 import edu.ie3.datamodel.exceptions.SourceException;
-import edu.ie3.simona.api.data.ExtDataConnection;
-import edu.ie3.simona.api.data.container.ExtInputDataContainer;
-import edu.ie3.simona.api.data.em.EmMode;
-import edu.ie3.simona.api.data.em.ExtEmDataConnection;
-import edu.ie3.simona.api.data.em.model.EmSetPoint;
-import edu.ie3.simona.api.data.mapping.DataType;
-import edu.ie3.simona.api.data.mapping.ExtEntityEntry;
-import edu.ie3.simona.api.data.mapping.ExtEntityMapping;
-import edu.ie3.simona.api.data.mapping.ExtEntityMappingSource;
-import edu.ie3.simona.api.data.results.ExtResultDataConnection;
+import edu.ie3.simona.api.data.connection.ExtDataConnection;
+import edu.ie3.simona.api.data.connection.ExtEmDataConnection;
+import edu.ie3.simona.api.data.connection.ExtEmDataConnection.EmMode;
+import edu.ie3.simona.api.data.connection.ExtResultDataConnection;
+import edu.ie3.simona.api.data.container.ExtInputContainer;
+import edu.ie3.simona.api.data.model.em.EmSetPoint;
+import edu.ie3.simona.api.mapping.DataType;
+import edu.ie3.simona.api.mapping.ExtEntityMapping;
 import edu.ie3.simona.api.simulation.ExtCoSimulation;
+import edu.ie3.simona.api.simulation.mapping.ExtEntityEntry;
+import edu.ie3.simona.api.simulation.mapping.ExtEntityMappingSource;
 import java.nio.file.Path;
 import java.util.*;
 import org.slf4j.Logger;
@@ -59,6 +59,7 @@ public class OpsimSimulation extends ExtCoSimulation {
         buildEmConnection(
             mapping.getEntries(DataType.EXT_EM_INPUT).stream().map(ExtEntityEntry::uuid).toList(),
             EmMode.BASE,
+            Optional.empty(),
             log);
 
     this.simonaProxy = new SimonaProxy();
@@ -105,7 +106,7 @@ public class OpsimSimulation extends ExtCoSimulation {
     long nextTick = tick + stepSize;
 
     try {
-      ExtInputDataContainer container = simonaProxy.queueToSIMONA.takeAll();
+      ExtInputContainer container = simonaProxy.queueToSIMONA.takeContainer();
 
       Optional<Long> maybeNextTick = container.getMaybeNextTick();
 
