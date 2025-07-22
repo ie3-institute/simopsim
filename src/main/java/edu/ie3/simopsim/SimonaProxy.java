@@ -25,7 +25,7 @@ import edu.ie3.simona.api.data.container.ExtResultContainer;
 import edu.ie3.simona.api.data.model.em.EmSetPoint;
 import edu.ie3.simona.api.mapping.DataType;
 import edu.ie3.simona.api.mapping.ExtEntityMapping;
-import edu.ie3.simona.api.simulation.mapping.ExtEntityEntry;
+import edu.ie3.simona.api.mapping.ExtEntityEntry;
 import edu.ie3.simopsim.initialization.InitializationData;
 import edu.ie3.simopsim.initialization.InitializationQueue;
 import java.io.IOException;

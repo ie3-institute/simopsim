@@ -15,7 +15,7 @@ import edu.ie3.simona.api.data.model.em.EmSetPoint;
 import edu.ie3.simona.api.mapping.DataType;
 import edu.ie3.simona.api.mapping.ExtEntityMapping;
 import edu.ie3.simona.api.simulation.ExtCoSimulation;
-import edu.ie3.simona.api.simulation.mapping.ExtEntityEntry;
+import edu.ie3.simona.api.mapping.ExtEntityEntry;
 import edu.ie3.simopsim.initialization.InitializationData;
 import edu.ie3.simopsim.initialization.InitializationQueue;
 import java.util.*;
@@ -52,7 +52,6 @@ public final class OpsimSimulation extends ExtCoSimulation {
         buildEmConnection(
             mapping.getEntries(DataType.EXT_EM_INPUT).stream().map(ExtEntityEntry::uuid).toList(),
             EmMode.BASE,
-            Optional.empty(),
             log);
 
     Map<DataType, List<UUID>> map = new HashMap<>();
