@@ -6,7 +6,6 @@
 
 package edu.ie3.simopsim;
 
-import edu.ie3.datamodel.exceptions.SourceException;
 import edu.ie3.simona.api.data.connection.ExtDataConnection;
 import edu.ie3.simona.api.data.connection.ExtEmDataConnection;
 import edu.ie3.simona.api.data.connection.ExtEmDataConnection.EmMode;
@@ -17,41 +16,35 @@ import edu.ie3.simona.api.mapping.DataType;
 import edu.ie3.simona.api.mapping.ExtEntityMapping;
 import edu.ie3.simona.api.simulation.ExtCoSimulation;
 import edu.ie3.simona.api.simulation.mapping.ExtEntityEntry;
-import edu.ie3.simona.api.simulation.mapping.ExtEntityMappingSource;
-import java.nio.file.Path;
+import edu.ie3.simopsim.initialization.InitializationData;
+import edu.ie3.simopsim.initialization.InitializationQueue;
 import java.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class OpsimSimulation extends ExtCoSimulation {
+public final class OpsimSimulation extends ExtCoSimulation {
 
-  protected static final Logger log = LoggerFactory.getLogger(OpsimSimulation.class);
+  private static final Logger log = LoggerFactory.getLogger(OpsimSimulation.class);
 
-  protected final SimonaProxy simonaProxy;
-
-  protected final ExtEntityMapping mapping;
-
-  protected final int stepSize;
+  private final long stepSize;
 
   private final ExtEmDataConnection extEmDataConnection;
-  protected final ExtResultDataConnection extResultDataConnection;
+  private final ExtResultDataConnection extResultDataConnection;
 
-  protected OpsimSimulation(String simulationName, String urlToOpsim, Path mappingPath) {
-    this(simulationName, "SimonaProxy", urlToOpsim, mappingPath, 900);
-  }
+  public OpsimSimulation(String simulationName, InitializationQueue queue) {
+    super(simulationName, "SimonaProxy");
 
-  protected OpsimSimulation(
-      String simulationName,
-      String extSimulatorName,
-      String urlToOpsim,
-      Path mappingPath,
-      int stepSize) {
-    super(simulationName, extSimulatorName);
-    this.stepSize = stepSize;
+    ExtEntityMapping mapping;
 
     try {
-      this.mapping = ExtEntityMappingSource.fromFile(mappingPath);
-    } catch (SourceException e) {
+      InitializationData.SimulatorData data = queue.take(InitializationData.SimulatorData.class);
+
+      this.stepSize = data.stepSize();
+      mapping = data.mapping();
+
+      data.setConnectionToSimonaApi().accept(queueToSimona, queueToExt);
+
+    } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
 
@@ -61,9 +54,6 @@ public class OpsimSimulation extends ExtCoSimulation {
             EmMode.BASE,
             Optional.empty(),
             log);
-
-    this.simonaProxy = new SimonaProxy();
-    simonaProxy.setConnectionToSimonaApi(queueToSimona, queueToExt, mapping);
 
     Map<DataType, List<UUID>> map = new HashMap<>();
     List<UUID> participantResults =
@@ -82,9 +72,6 @@ public class OpsimSimulation extends ExtCoSimulation {
     map.put(DataType.EXT_FLEX_OPTIONS_RESULT, flexResults);
 
     this.extResultDataConnection = buildResultConnection(map, log);
-
-    SimopsimUtils.runSimopsim(simonaProxy, urlToOpsim);
-    log.info("Connected to: {}", urlToOpsim);
   }
 
   @Override
@@ -106,7 +93,7 @@ public class OpsimSimulation extends ExtCoSimulation {
     long nextTick = tick + stepSize;
 
     try {
-      ExtInputContainer container = simonaProxy.queueToSIMONA.takeContainer();
+      ExtInputContainer container = queueToSimona.takeContainer();
 
       Optional<Long> maybeNextTick = container.getMaybeNextTick();
 

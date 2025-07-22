@@ -11,10 +11,14 @@ import edu.ie3.simona.api.exceptions.NoExtSimulationException;
 import edu.ie3.simona.api.simulation.ExtSimAdapterData;
 import edu.ie3.simona.api.simulation.ExtSimulation;
 import edu.ie3.simopsim.config.ArgsParser;
-import java.nio.file.Path;
+import edu.ie3.simopsim.initialization.InitializationQueue;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class SimopsimExtLink implements ExtLinkInterface {
+
+  public static Logger log = LoggerFactory.getLogger(SimopsimExtLink.class);
 
   OpsimSimulation emSimulation;
 
@@ -32,11 +36,17 @@ public class SimopsimExtLink implements ExtLinkInterface {
     ArgsParser.Arguments arguments = ArgsParser.parse(data.getMainArgs());
 
     Optional<String> urlToOpsim = arguments.urlToOpsim();
-    Optional<Path> mappingPath = arguments.mappingPath();
 
-    if (urlToOpsim.isPresent() && mappingPath.isPresent()) {
-      emSimulation = new OpsimSimulation("SIMONA Simulation", urlToOpsim.get(), mappingPath.get());
+    if (urlToOpsim.isPresent()) {
+      InitializationQueue queue = new InitializationQueue();
+
+      SimonaProxy simonaProxy = new SimonaProxy(queue);
+
+      emSimulation = new OpsimSimulation("SIMONA Simulation", queue);
       emSimulation.setAdapterData(data);
+
+      SimopsimUtils.runSimopsim(simonaProxy, urlToOpsim.get());
+      log.info("Connected to: {}", urlToOpsim);
     }
   }
 }

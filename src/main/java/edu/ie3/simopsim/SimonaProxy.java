@@ -6,6 +6,8 @@
 
 package edu.ie3.simopsim;
 
+import static de.fhg.iwes.opsim.datamodel.generated.realtimedata.MeasurementValueType.*;
+
 import de.fhg.iee.opsim.DAO.AssetComparator;
 import de.fhg.iee.opsim.DAO.ProxyConfigDAO;
 import de.fhg.iee.opsim.abstracts.ConservativeSynchronizedProxy;
@@ -13,6 +15,7 @@ import de.fhg.iee.opsim.client.Client;
 import de.fhg.iee.opsim.interfaces.ClientInterface;
 import de.fhg.iwes.opsim.datamodel.generated.asset.Asset;
 import de.fhg.iwes.opsim.datamodel.generated.assetoperator.AssetOperator;
+import de.fhg.iwes.opsim.datamodel.generated.realtimedata.MeasurementValueType;
 import de.fhg.iwes.opsim.datamodel.generated.realtimedata.OpSimAggregatedSetPoints;
 import de.fhg.iwes.opsim.datamodel.generated.realtimedata.OpSimMessage;
 import de.fhg.iwes.opsim.datamodel.generated.scenarioconfig.ScenarioConfig;
@@ -20,22 +23,25 @@ import edu.ie3.simona.api.data.ExtDataContainerQueue;
 import edu.ie3.simona.api.data.container.ExtInputContainer;
 import edu.ie3.simona.api.data.container.ExtResultContainer;
 import edu.ie3.simona.api.data.model.em.EmSetPoint;
+import edu.ie3.simona.api.mapping.DataType;
 import edu.ie3.simona.api.mapping.ExtEntityMapping;
+import edu.ie3.simona.api.simulation.mapping.ExtEntityEntry;
+import edu.ie3.simopsim.initialization.InitializationData;
+import edu.ie3.simopsim.initialization.InitializationQueue;
 import java.io.IOException;
-import java.util.List;
-import java.util.Queue;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import javax.xml.bind.JAXBException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 /** Class that extends the Proxy interface of OPSIM */
-public class SimonaProxy extends ConservativeSynchronizedProxy {
+public final class SimonaProxy extends ConservativeSynchronizedProxy {
 
-  protected Logger logger;
-  protected ClientInterface cli;
-  protected String componentDescription = "SIMONA";
+  private Logger logger;
+  private ClientInterface cli;
+  private String componentDescription = "SIMONA";
 
   private long delta = -1L;
   private long lastTimeStep = 0L;
@@ -44,12 +50,16 @@ public class SimonaProxy extends ConservativeSynchronizedProxy {
   private final Set<Asset> readable = new TreeSet<>(new AssetComparator());
   private final Set<Asset> writable = new TreeSet<>(new AssetComparator());
 
+  private final InitializationQueue queue;
+
   public ExtDataContainerQueue<ExtInputContainer> queueToSIMONA;
   public ExtDataContainerQueue<ExtResultContainer> queueToOpSim;
   private ExtEntityMapping mapping;
 
-  public SimonaProxy() {
+  public SimonaProxy(InitializationQueue queue) {
     try {
+      this.queue = queue;
+
       Logger logger = LogManager.getLogger(Client.class);
       Client client = new Client(logger);
       this.logger = logger;
@@ -65,11 +75,9 @@ public class SimonaProxy extends ConservativeSynchronizedProxy {
 
   public void setConnectionToSimonaApi(
       ExtDataContainerQueue<ExtInputContainer> queueToSIMONA,
-      ExtDataContainerQueue<ExtResultContainer> queueToOpSim,
-      ExtEntityMapping mapping) {
+      ExtDataContainerQueue<ExtResultContainer> queueToOpSim) {
     this.queueToSIMONA = queueToSIMONA;
     this.queueToOpSim = queueToOpSim;
-    this.mapping = mapping;
   }
 
   @Override
@@ -92,25 +100,86 @@ public class SimonaProxy extends ConservativeSynchronizedProxy {
       try {
         ScenarioConfig scenarioConfig = ScenarioConfigReader.read(componentConfig);
 
-        for (AssetOperator ao : scenarioConfig.getAssetOperator()) {
-          if (ao.getAssetOperatorName().equals(this.getComponentName())) {
-            this.readable.addAll(ao.getReadableAssets());
-            this.writable.addAll(ao.getControlledAssets());
-            this.delta = ao.getOperationInterval();
-          }
+        List<AssetOperator> operators =
+            scenarioConfig.getAssetOperator().stream()
+                .filter(ao -> ao.getAssetOperatorName().equals(this.getComponentName()))
+                .toList();
+
+        List<ExtEntityEntry> entries = new ArrayList<>();
+
+        for (AssetOperator ao : operators) {
+          Function<List<Asset>, Map<String, Asset>> toMap =
+              list -> list.stream().collect(Collectors.toMap(Asset::getGridAssetId, a -> a));
+
+          Map<String, Asset> idToReadableAsset = toMap.apply(ao.getReadableAssets());
+          Map<String, Asset> idToControlledAsset = toMap.apply(ao.getControlledAssets());
+
+          Set<String> both =
+              idToReadableAsset.keySet().stream()
+                  .filter(idToControlledAsset::containsKey)
+                  .collect(Collectors.toSet());
+
+          // handle readable assets
+          idToReadableAsset.forEach(
+              (assetId, asset) -> {
+                UUID uuid = UUID.fromString(assetId);
+
+                entries.add(
+                    new ExtEntityEntry(
+                        uuid, assetId, getDataType(asset.getMeasurableQuantities())));
+                this.readable.add(asset);
+              });
+
+          // handle controlled assets
+          idToControlledAsset.forEach(
+              (assetId, asset) -> {
+                UUID uuid = UUID.fromString(assetId);
+
+                entries.add(
+                    new ExtEntityEntry(
+                        uuid, assetId, getDataType(asset.getMeasurableQuantities())));
+                this.writable.add(asset);
+              });
+
+          // handle both
+          both.forEach(
+              assetId -> {
+                Asset readable = idToReadableAsset.get(assetId);
+                Asset controlled = idToControlledAsset.get(assetId);
+
+                DataType type =
+                    getDataType(
+                        readable.getMeasurableQuantities(), controlled.getMeasurableQuantities());
+
+                entries.add(new ExtEntityEntry(UUID.fromString(assetId), assetId, type));
+
+                this.readable.add(readable);
+                this.writable.add(controlled);
+              });
+
+          this.delta = ao.getOperationInterval();
         }
 
         this.initTimeStep = cli.getClock().getActualTime().getMillis();
         this.lastTimeStep = initTimeStep;
+
+        this.mapping = new ExtEntityMapping(entries);
 
         this.logger.info(
             "Component {}, got Readables: {}, Writables: {} and Delta: {}",
             new Object[] {
               this.componentDescription, this.readable.size(), this.writable.size(), this.delta
             });
+
+        queue.put(
+            new InitializationData.SimulatorData(delta, mapping, this::setConnectionToSimonaApi));
+
         return true;
       } catch (JAXBException ex) {
         this.logger.error("Problem with the Config Data not right format and or incomplete. ", ex);
+        return false;
+      } catch (InterruptedException e) {
+        this.logger.error("Could not send init data to SIMONA.", e);
         return false;
       }
     } else {
@@ -121,11 +190,11 @@ public class SimonaProxy extends ConservativeSynchronizedProxy {
   @Override
   public Queue<OpSimMessage> step(Queue<OpSimMessage> inputFromClient, long timeStep) {
     logger.info(
-        componentDescription
-            + " step call at simulation time = "
-            + cli.getClock().getActualTime().getMillis()
-            + " present timezone = "
-            + cli.getCurrentSimulationTime());
+        "{} step call at simulation time = {} present timezone = {}",
+        componentDescription,
+        cli.getClock().getActualTime().getMillis(),
+        cli.getCurrentSimulationTime());
+
     if (timeStep == this.initTimeStep
         || (timeStep < this.lastTimeStep + this.delta && timeStep != this.lastTimeStep)) {
       return null;
@@ -133,7 +202,7 @@ public class SimonaProxy extends ConservativeSynchronizedProxy {
       // Get message from external
       this.lastTimeStep = timeStep;
       try {
-        logger.info("Received messages for " + this.cli.getCurrentSimulationTime().toString());
+        logger.info("Received messages for {}", this.cli.getCurrentSimulationTime().toString());
         List<EmSetPoint> dataForSimona = SimopsimUtils.createEmSetPoints(inputFromClient, mapping);
         ExtInputContainer inputDataContainer = new ExtInputContainer(0L);
         dataForSimona.forEach(inputDataContainer::addSetPoint);
@@ -153,7 +222,7 @@ public class SimonaProxy extends ConservativeSynchronizedProxy {
         logger.info("Received results from SIMONA!");
 
         logger.debug(
-            "Send Aggregated SetPoints for " + this.cli.getCurrentSimulationTime().toString());
+            "Send Aggregated SetPoints for {}", this.cli.getCurrentSimulationTime().toString());
         List<OpSimAggregatedSetPoints> osmAggSetPoints =
             SimopsimUtils.createSimopsimOutputList(
                 writable, cli.getClock().getActualTime().plus(delta).getMillis(), results, mapping);
@@ -179,7 +248,7 @@ public class SimonaProxy extends ConservativeSynchronizedProxy {
 
   // -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-  protected void printMsg(List<OpSimAggregatedSetPoints> osmAggSetPoints) {
+  private void printMsg(List<OpSimAggregatedSetPoints> osmAggSetPoints) {
     var simulationTime = this.cli.getCurrentSimulationTime();
 
     System.out.println();
@@ -189,7 +258,7 @@ public class SimonaProxy extends ConservativeSynchronizedProxy {
     System.out.println();
   }
 
-  protected <T extends OpSimMessage> void sendToOpSim(List<T> inputFromComponent) {
+  private <T extends OpSimMessage> void sendToOpSim(List<T> inputFromComponent) {
     if (inputFromComponent.isEmpty()) {
       logger.info("The component has not generated output to send.");
     } else {
@@ -198,5 +267,32 @@ public class SimonaProxy extends ConservativeSynchronizedProxy {
       }
       logger.info("Results sent: {}", cli.getClock().getActualTime().toDateTimeISO());
     }
+  }
+
+  public static DataType getDataType(List<MeasurementValueType> measurementValueTypes) {
+    throw new IllegalArgumentException(
+        "Could not find valid data type from given measurementValueTypes: "
+            + measurementValueTypes);
+  }
+
+  public static DataType getDataType(
+      List<MeasurementValueType> readableMeasurementValueType,
+      List<MeasurementValueType> controlledMeasurementValueTypes) {
+
+    boolean isEM =
+        readableMeasurementValueType.size() == 1
+            && readableMeasurementValueType.contains(FLEXIBILITY_SCHEDULE)
+            && (controlledMeasurementValueTypes.contains(ACTIVE_POWER)
+                || controlledMeasurementValueTypes.contains(REACTIVE_POWER));
+
+    if (isEM) {
+      return DataType.EXT_EM_INPUT;
+    }
+
+    throw new IllegalArgumentException(
+        "Could not find valid data type from given readable measurementValueTypes: "
+            + readableMeasurementValueType
+            + " and controlledMeasurementValueTypes: "
+            + controlledMeasurementValueTypes);
   }
 }
