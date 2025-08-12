@@ -13,9 +13,9 @@ import edu.ie3.simona.api.data.connection.ExtResultDataConnection;
 import edu.ie3.simona.api.data.container.ExtInputContainer;
 import edu.ie3.simona.api.data.model.em.EmSetPoint;
 import edu.ie3.simona.api.mapping.DataType;
+import edu.ie3.simona.api.mapping.ExtEntityEntry;
 import edu.ie3.simona.api.mapping.ExtEntityMapping;
 import edu.ie3.simona.api.simulation.ExtCoSimulation;
-import edu.ie3.simona.api.mapping.ExtEntityEntry;
 import edu.ie3.simopsim.initialization.InitializationData;
 import edu.ie3.simopsim.initialization.InitializationQueue;
 import java.util.*;
@@ -54,7 +54,8 @@ public final class OpsimSimulation extends ExtCoSimulation {
             EmMode.BASE,
             log);
 
-    Map<DataType, List<UUID>> map = new HashMap<>();
+    // result data connection
+    Map<DataType, List<UUID>> resultInput = new HashMap<>();
     List<UUID> participantResults =
         mapping.getEntries(DataType.EXT_PARTICIPANT_RESULT).stream()
             .map(ExtEntityEntry::uuid)
@@ -66,11 +67,13 @@ public final class OpsimSimulation extends ExtCoSimulation {
             .map(ExtEntityEntry::uuid)
             .toList();
 
-    map.put(DataType.EXT_PARTICIPANT_RESULT, participantResults);
-    map.put(DataType.EXT_GRID_RESULT, gridResults);
-    map.put(DataType.EXT_FLEX_OPTIONS_RESULT, flexResults);
+    resultInput.put(DataType.EXT_PARTICIPANT_RESULT, participantResults);
+    resultInput.put(DataType.EXT_GRID_RESULT, gridResults);
+    resultInput.put(DataType.EXT_FLEX_OPTIONS_RESULT, flexResults);
 
-    this.extResultDataConnection = buildResultConnection(map, log);
+    boolean buildResult =
+        !participantResults.isEmpty() && !gridResults.isEmpty() && !flexResults.isEmpty();
+    this.extResultDataConnection = buildResult ? buildResultConnection(resultInput, log) : null;
   }
 
   @Override

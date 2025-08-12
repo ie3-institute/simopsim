@@ -11,7 +11,6 @@ import static de.fhg.iwes.opsim.datamodel.generated.realtimedata.MeasurementValu
 import de.fhg.iee.opsim.DAO.AssetComparator;
 import de.fhg.iee.opsim.DAO.ProxyConfigDAO;
 import de.fhg.iee.opsim.abstracts.ConservativeSynchronizedProxy;
-import de.fhg.iee.opsim.client.Client;
 import de.fhg.iee.opsim.interfaces.ClientInterface;
 import de.fhg.iwes.opsim.datamodel.generated.asset.Asset;
 import de.fhg.iwes.opsim.datamodel.generated.assetoperator.AssetOperator;
@@ -24,16 +23,14 @@ import edu.ie3.simona.api.data.container.ExtInputContainer;
 import edu.ie3.simona.api.data.container.ExtResultContainer;
 import edu.ie3.simona.api.data.model.em.EmSetPoint;
 import edu.ie3.simona.api.mapping.DataType;
-import edu.ie3.simona.api.mapping.ExtEntityMapping;
 import edu.ie3.simona.api.mapping.ExtEntityEntry;
+import edu.ie3.simona.api.mapping.ExtEntityMapping;
 import edu.ie3.simopsim.initialization.InitializationData;
 import edu.ie3.simopsim.initialization.InitializationQueue;
-import java.io.IOException;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.xml.bind.JAXBException;
-import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 /** Class that extends the Proxy interface of OPSIM */
@@ -57,20 +54,7 @@ public final class SimonaProxy extends ConservativeSynchronizedProxy {
   private ExtEntityMapping mapping;
 
   public SimonaProxy(InitializationQueue queue) {
-    try {
-      this.queue = queue;
-
-      Logger logger = LogManager.getLogger(Client.class);
-      Client client = new Client(logger);
-      this.logger = logger;
-      this.cli = client;
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  public ClientInterface getCli() {
-    return cli;
+    this.queue = queue;
   }
 
   public void setConnectionToSimonaApi(
@@ -89,7 +73,7 @@ public final class SimonaProxy extends ConservativeSynchronizedProxy {
 
   @Override
   public boolean initProxy(ProxyConfigDAO config) {
-    logger.info("Proxy {} is initialized!", componentDescription);
+    // logger.info("Proxy {} is initialized!", componentDescription);
     this.setNrOfComponents(config.getNrOfComponents());
     return true;
   }
@@ -119,6 +103,23 @@ public final class SimonaProxy extends ConservativeSynchronizedProxy {
                   .filter(idToControlledAsset::containsKey)
                   .collect(Collectors.toSet());
 
+          // handle assets that have readable and writable attributes
+          both.forEach(
+              assetId -> {
+                // remove needed to prevent second execution
+                Asset readable = idToReadableAsset.remove(assetId);
+                Asset controlled = idToControlledAsset.remove(assetId);
+
+                DataType type =
+                    getDataType(
+                        readable.getMeasurableQuantities(), controlled.getMeasurableQuantities());
+
+                entries.add(new ExtEntityEntry(UUID.fromString(assetId), assetId, type));
+
+                this.readable.add(readable);
+                this.writable.add(controlled);
+              });
+
           // handle readable assets
           idToReadableAsset.forEach(
               (assetId, asset) -> {
@@ -141,22 +142,6 @@ public final class SimonaProxy extends ConservativeSynchronizedProxy {
                 this.writable.add(asset);
               });
 
-          // handle both
-          both.forEach(
-              assetId -> {
-                Asset readable = idToReadableAsset.get(assetId);
-                Asset controlled = idToControlledAsset.get(assetId);
-
-                DataType type =
-                    getDataType(
-                        readable.getMeasurableQuantities(), controlled.getMeasurableQuantities());
-
-                entries.add(new ExtEntityEntry(UUID.fromString(assetId), assetId, type));
-
-                this.readable.add(readable);
-                this.writable.add(controlled);
-              });
-
           this.delta = ao.getOperationInterval();
         }
 
@@ -165,7 +150,7 @@ public final class SimonaProxy extends ConservativeSynchronizedProxy {
 
         this.mapping = new ExtEntityMapping(entries);
 
-        this.logger.info(
+        logger.info(
             "Component {}, got Readables: {}, Writables: {} and Delta: {}",
             new Object[] {
               this.componentDescription, this.readable.size(), this.writable.size(), this.delta
@@ -176,10 +161,10 @@ public final class SimonaProxy extends ConservativeSynchronizedProxy {
 
         return true;
       } catch (JAXBException ex) {
-        this.logger.error("Problem with the Config Data not right format and or incomplete. ", ex);
+        logger.error("Problem with the Config Data not right format and or incomplete. ", ex);
         return false;
       } catch (InterruptedException e) {
-        this.logger.error("Could not send init data to SIMONA.", e);
+        logger.error("Could not send init data to SIMONA.", e);
         return false;
       }
     } else {

@@ -6,13 +6,19 @@
 
 package edu.ie3.simopsim;
 
+import de.fhg.iee.opsim.client.Client;
 import edu.ie3.simona.api.ExtLinkInterface;
 import edu.ie3.simona.api.exceptions.NoExtSimulationException;
 import edu.ie3.simona.api.simulation.ExtSimAdapterData;
 import edu.ie3.simona.api.simulation.ExtSimulation;
 import edu.ie3.simopsim.config.ArgsParser;
 import edu.ie3.simopsim.initialization.InitializationQueue;
+import java.io.IOException;
+import java.net.URISyntaxException;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
 import java.util.Optional;
+import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,13 +46,21 @@ public class SimopsimExtLink implements ExtLinkInterface {
     if (urlToOpsim.isPresent()) {
       InitializationQueue queue = new InitializationQueue();
 
-      SimonaProxy simonaProxy = new SimonaProxy(queue);
+      try {
+        SimonaProxy proxy = new SimonaProxy(queue);
+        Client client = SimopsimUtils.clientWithProxy(proxy);
+        client.start(urlToOpsim.get());
+        log.info("Connected to: {}", urlToOpsim);
+      } catch (IOException
+          | URISyntaxException
+          | NoSuchAlgorithmException
+          | KeyManagementException
+          | TimeoutException e) {
+        throw new RuntimeException(e);
+      }
 
       emSimulation = new OpsimSimulation("SIMONA Simulation", queue);
       emSimulation.setAdapterData(data);
-
-      SimopsimUtils.runSimopsim(simonaProxy, urlToOpsim.get());
-      log.info("Connected to: {}", urlToOpsim);
     }
   }
 }

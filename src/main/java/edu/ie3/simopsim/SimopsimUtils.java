@@ -6,6 +6,7 @@
 
 package edu.ie3.simopsim;
 
+import de.fhg.iee.opsim.client.Client;
 import de.fhg.iwes.opsim.datamodel.generated.asset.Asset;
 import de.fhg.iwes.opsim.datamodel.generated.flexforecast.OpSimFlexibilityForecastMessage;
 import de.fhg.iwes.opsim.datamodel.generated.realtimedata.*;
@@ -18,12 +19,10 @@ import edu.ie3.simona.api.data.model.em.EmSetPoint;
 import edu.ie3.simona.api.mapping.ExtEntityMapping;
 import edu.ie3.util.quantities.PowerSystemUnits;
 import java.io.IOException;
-import java.net.URISyntaxException;
-import java.security.KeyManagementException;
-import java.security.NoSuchAlgorithmException;
 import java.util.*;
-import java.util.concurrent.TimeoutException;
+import org.apache.logging.slf4j.SLF4JLogger;
 import org.joda.time.DateTime;
+import org.slf4j.LoggerFactory;
 import tech.units.indriya.quantity.Quantities;
 
 /** Helpful methods to implement a SIMONA-OPSIM coupling. */
@@ -31,17 +30,13 @@ public class SimopsimUtils {
 
   private SimopsimUtils() {}
 
-  public static void runSimopsim(SimonaProxy simonaProxy, String urlToOpsim) {
-    try {
-      simonaProxy.getCli().addProxy(simonaProxy);
-      simonaProxy.getCli().reconnect(urlToOpsim);
-    } catch (URISyntaxException
-        | IOException
-        | NoSuchAlgorithmException
-        | KeyManagementException
-        | TimeoutException e) {
-      throw new RuntimeException(e);
-    }
+  public static Client clientWithProxy(SimonaProxy proxy) throws IOException {
+    SLF4JLogger logger = new SLF4JLogger("Client", LoggerFactory.getLogger(Client.class));
+    Client client = new Client(logger);
+    proxy.SetUp("SIMONA", client, logger);
+    client.addProxy(proxy);
+
+    return client;
   }
 
   public static void printMessage(OpSimMessage osm, DateTime simulationTime) {
