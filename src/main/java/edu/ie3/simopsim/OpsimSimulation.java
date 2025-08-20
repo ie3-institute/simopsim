@@ -19,6 +19,8 @@ import edu.ie3.simona.api.simulation.ExtCoSimulation;
 import edu.ie3.simopsim.initialization.InitializationData;
 import edu.ie3.simopsim.initialization.InitializationQueue;
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,7 +80,9 @@ public final class OpsimSimulation extends ExtCoSimulation {
 
   @Override
   public Set<ExtDataConnection> getDataConnections() {
-    return Set.of(extEmDataConnection, extResultDataConnection);
+    return Stream.of(extEmDataConnection, extResultDataConnection)
+        .filter(Objects::nonNull)
+        .collect(Collectors.toSet());
   }
 
   @Override

@@ -50,46 +50,47 @@ public class SimopsimUtils {
         .append(topic)
         .append(";");
 
-    if (osm instanceof OpSimAggregatedMeasurements osmms) {
-      osmms
-          .getOpSimMeasurements()
-          .forEach(
-              osmm ->
-                  strb.append(osmm.getMeasurementType())
-                      .append(";")
-                      .append(osmm.getMeasurementValue())
-                      .append(";"));
-
-    } else if (osm instanceof OpSimAggregatedSetPoints ossp) {
-      ossp.getOpSimSetPoints()
-          .forEach(
-              osmm ->
-                  strb.append(osmm.getSetPointValueType())
-                      .append(";")
-                      .append(osmm.getSetPointValue())
-                      .append(";"));
-    } else if (osm instanceof OpSimFlexibilityForecastMessage off) {
-      off.getForecastMessages()
-          .forEach(
-              ofe ->
-                  strb.append(ofe.getLeadTimeInUTC())
-                      .append(";")
-                      .append(ofe.getType())
-                      .append(";")
-                      .append(ofe.getMax())
-                      .append(";")
-                      .append(ofe.getMin())
-                      .append(";"));
-    } else if (osm instanceof OpSimScheduleMessage osme) {
-      osme.getScheduleElements()
-          .forEach(
-              ose ->
-                  strb.append(ose.getScheduleTimeInUTC())
-                      .append(";")
-                      .append(ose.getScheduledValueType())
-                      .append(";")
-                      .append(ose.getScheduledValue())
-                      .append(";"));
+    switch (osm) {
+      case OpSimAggregatedMeasurements osmms ->
+          osmms
+              .getOpSimMeasurements()
+              .forEach(
+                  osmm ->
+                      strb.append(osmm.getMeasurementType())
+                          .append(";")
+                          .append(osmm.getMeasurementValue())
+                          .append(";"));
+      case OpSimAggregatedSetPoints ossp ->
+          ossp.getOpSimSetPoints()
+              .forEach(
+                  osmm ->
+                      strb.append(osmm.getSetPointValueType())
+                          .append(";")
+                          .append(osmm.getSetPointValue())
+                          .append(";"));
+      case OpSimFlexibilityForecastMessage off ->
+          off.getForecastMessages()
+              .forEach(
+                  ofe ->
+                      strb.append(ofe.getLeadTimeInUTC())
+                          .append(";")
+                          .append(ofe.getType())
+                          .append(";")
+                          .append(ofe.getMax())
+                          .append(";")
+                          .append(ofe.getMin())
+                          .append(";"));
+      case OpSimScheduleMessage osme ->
+          osme.getScheduleElements()
+              .forEach(
+                  ose ->
+                      strb.append(ose.getScheduleTimeInUTC())
+                          .append(";")
+                          .append(ose.getScheduledValueType())
+                          .append(";")
+                          .append(ose.getScheduledValue())
+                          .append(";"));
+      default -> {}
     }
 
     System.out.println(strb);
