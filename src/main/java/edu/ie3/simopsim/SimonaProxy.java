@@ -20,16 +20,13 @@ import de.fhg.iwes.opsim.datamodel.generated.realtimedata.OpSimMessage;
 import de.fhg.iwes.opsim.datamodel.generated.scenarioconfig.ScenarioConfig;
 import edu.ie3.simona.api.data.ExtDataContainerQueue;
 import edu.ie3.simona.api.data.container.ExtInputContainer;
-import edu.ie3.simona.api.data.container.ExtResultContainer;
+import edu.ie3.simona.api.data.container.ExtOutputContainer;
 import edu.ie3.simona.api.data.model.em.EmSetPoint;
 import edu.ie3.simona.api.mapping.DataType;
-import edu.ie3.simona.api.mapping.ExtEntityEntry;
 import edu.ie3.simona.api.mapping.ExtEntityMapping;
 import edu.ie3.simopsim.initialization.InitializationData;
 import edu.ie3.simopsim.initialization.InitializationQueue;
 import java.util.*;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import javax.xml.bind.JAXBException;
 import org.apache.logging.log4j.Logger;
 
@@ -50,16 +47,17 @@ public final class SimonaProxy extends ConservativeSynchronizedProxy {
   private final InitializationQueue queue;
 
   public ExtDataContainerQueue<ExtInputContainer> queueToSIMONA;
-  public ExtDataContainerQueue<ExtResultContainer> queueToOpSim;
-  private ExtEntityMapping mapping;
+  public ExtDataContainerQueue<ExtOutputContainer> queueToOpSim;
+  private final ExtEntityMapping mapping;
 
-  public SimonaProxy(InitializationQueue queue) {
+  public SimonaProxy(InitializationQueue queue, ExtEntityMapping mapping) {
     this.queue = queue;
+    this.mapping = mapping;
   }
 
   public void setConnectionToSimonaApi(
       ExtDataContainerQueue<ExtInputContainer> queueToSIMONA,
-      ExtDataContainerQueue<ExtResultContainer> queueToOpSim) {
+      ExtDataContainerQueue<ExtOutputContainer> queueToOpSim) {
     this.queueToSIMONA = queueToSIMONA;
     this.queueToOpSim = queueToOpSim;
   }
@@ -89,66 +87,14 @@ public final class SimonaProxy extends ConservativeSynchronizedProxy {
                 .filter(ao -> ao.getAssetOperatorName().equals(this.getComponentName()))
                 .toList();
 
-        List<ExtEntityEntry> entries = new ArrayList<>();
-
         for (AssetOperator ao : operators) {
-          Function<List<Asset>, Map<String, Asset>> toMap =
-              list -> list.stream().collect(Collectors.toMap(Asset::getGridAssetId, a -> a));
-
-          Map<String, Asset> idToReadableAsset = toMap.apply(ao.getReadableAssets());
-          Map<String, Asset> idToControlledAsset = toMap.apply(ao.getControlledAssets());
-
-          Set<String> both =
-              idToReadableAsset.keySet().stream()
-                  .filter(idToControlledAsset::containsKey)
-                  .collect(Collectors.toSet());
-
-          // handle assets that have readable and writable attributes
-          both.forEach(
-              assetId -> {
-                // remove needed to prevent second execution
-                Asset readable = idToReadableAsset.remove(assetId);
-                Asset controlled = idToControlledAsset.remove(assetId);
-
-                DataType type =
-                    getDataType(
-                        readable.getMeasurableQuantities(), controlled.getMeasurableQuantities());
-
-                entries.add(new ExtEntityEntry(UUID.fromString(assetId), assetId, type));
-
-                this.readable.add(readable);
-                this.writable.add(controlled);
-              });
-
-          // handle readable assets
-          idToReadableAsset.forEach(
-              (assetId, asset) -> {
-                UUID uuid = UUID.fromString(assetId);
-
-                entries.add(
-                    new ExtEntityEntry(
-                        uuid, assetId, getDataType(asset.getMeasurableQuantities())));
-                this.readable.add(asset);
-              });
-
-          // handle controlled assets
-          idToControlledAsset.forEach(
-              (assetId, asset) -> {
-                UUID uuid = UUID.fromString(assetId);
-
-                entries.add(
-                    new ExtEntityEntry(
-                        uuid, assetId, getDataType(asset.getMeasurableQuantities())));
-                this.writable.add(asset);
-              });
-
+          this.readable.addAll(ao.getReadableAssets());
+          this.writable.addAll(ao.getControlledAssets());
           this.delta = ao.getOperationInterval();
         }
 
         this.initTimeStep = cli.getClock().getActualTime().getMillis();
         this.lastTimeStep = initTimeStep;
-
-        this.mapping = new ExtEntityMapping(entries);
 
         logger.info(
             "Component {}, got Readables: {}, Writables: {} and Delta: {}",
@@ -156,8 +102,7 @@ public final class SimonaProxy extends ConservativeSynchronizedProxy {
               this.componentDescription, this.readable.size(), this.writable.size(), this.delta
             });
 
-        queue.put(
-            new InitializationData.SimulatorData(delta, mapping, this::setConnectionToSimonaApi));
+        queue.put(new InitializationData.SimulatorData(delta, this::setConnectionToSimonaApi));
 
         return true;
       } catch (JAXBException ex) {
@@ -203,7 +148,7 @@ public final class SimonaProxy extends ConservativeSynchronizedProxy {
       try {
         logger.info("Wait for results from SIMONA!");
         // Wait for results from SIMONA!
-        ExtResultContainer results = queueToOpSim.takeContainer();
+        ExtOutputContainer results = queueToOpSim.takeContainer();
         logger.info("Received results from SIMONA!");
 
         logger.debug(
@@ -271,7 +216,7 @@ public final class SimonaProxy extends ConservativeSynchronizedProxy {
                 || controlledMeasurementValueTypes.contains(REACTIVE_POWER));
 
     if (isEM) {
-      return DataType.EXT_EM_INPUT;
+      return DataType.EM;
     }
 
     throw new IllegalArgumentException(

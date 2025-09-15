@@ -33,49 +33,31 @@ public final class OpsimSimulation extends ExtCoSimulation {
   private final ExtEmDataConnection extEmDataConnection;
   private final ExtResultDataConnection extResultDataConnection;
 
-  public OpsimSimulation(String simulationName, InitializationQueue queue) {
+  public OpsimSimulation(
+      String simulationName, InitializationQueue queue, ExtEntityMapping mapping) {
     super(simulationName, "SimonaProxy");
-
-    ExtEntityMapping mapping;
 
     try {
       InitializationData.SimulatorData data = queue.take(InitializationData.SimulatorData.class);
-
       this.stepSize = data.stepSize();
-      mapping = data.mapping();
-
       data.setConnectionToSimonaApi().accept(queueToSimona, queueToExt);
-
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
 
     this.extEmDataConnection =
         buildEmConnection(
-            mapping.getEntries(DataType.EXT_EM_INPUT).stream().map(ExtEntityEntry::uuid).toList(),
+            mapping.getEntries(DataType.EM).stream().map(ExtEntityEntry::uuid).toList(),
             EmMode.BASE,
             log);
 
     // result data connection
     Map<DataType, List<UUID>> resultInput = new HashMap<>();
-    List<UUID> participantResults =
-        mapping.getEntries(DataType.EXT_PARTICIPANT_RESULT).stream()
-            .map(ExtEntityEntry::uuid)
-            .toList();
-    List<UUID> gridResults =
-        mapping.getEntries(DataType.EXT_GRID_RESULT).stream().map(ExtEntityEntry::uuid).toList();
-    List<UUID> flexResults =
-        mapping.getEntries(DataType.EXT_FLEX_OPTIONS_RESULT).stream()
-            .map(ExtEntityEntry::uuid)
-            .toList();
+    List<UUID> results =
+        mapping.getEntries(DataType.RESULT).stream().map(ExtEntityEntry::uuid).toList();
 
-    resultInput.put(DataType.EXT_PARTICIPANT_RESULT, participantResults);
-    resultInput.put(DataType.EXT_GRID_RESULT, gridResults);
-    resultInput.put(DataType.EXT_FLEX_OPTIONS_RESULT, flexResults);
-
-    boolean buildResult =
-        !participantResults.isEmpty() && !gridResults.isEmpty() && !flexResults.isEmpty();
-    this.extResultDataConnection = buildResult ? buildResultConnection(resultInput, log) : null;
+    this.extResultDataConnection =
+        !results.isEmpty() ? buildResultConnection(resultInput, log) : null;
   }
 
   @Override

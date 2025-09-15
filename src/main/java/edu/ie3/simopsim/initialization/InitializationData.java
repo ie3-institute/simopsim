@@ -8,17 +8,15 @@ package edu.ie3.simopsim.initialization;
 
 import edu.ie3.simona.api.data.ExtDataContainerQueue;
 import edu.ie3.simona.api.data.container.ExtInputContainer;
-import edu.ie3.simona.api.data.container.ExtResultContainer;
-import edu.ie3.simona.api.mapping.ExtEntityMapping;
+import edu.ie3.simona.api.data.container.ExtOutputContainer;
 import java.util.function.BiConsumer;
 
 public interface InitializationData {
 
   record SimulatorData(
       long stepSize,
-      ExtEntityMapping mapping,
       BiConsumer<
-              ExtDataContainerQueue<ExtInputContainer>, ExtDataContainerQueue<ExtResultContainer>>
+              ExtDataContainerQueue<ExtInputContainer>, ExtDataContainerQueue<ExtOutputContainer>>
           setConnectionToSimonaApi)
       implements InitializationData {}
 }

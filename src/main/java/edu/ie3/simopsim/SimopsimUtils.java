@@ -14,7 +14,7 @@ import edu.ie3.datamodel.models.StandardUnits;
 import edu.ie3.datamodel.models.result.ResultEntity;
 import edu.ie3.datamodel.models.result.system.SystemParticipantResult;
 import edu.ie3.datamodel.models.value.PValue;
-import edu.ie3.simona.api.data.container.ExtResultContainer;
+import edu.ie3.simona.api.data.container.ExtOutputContainer;
 import edu.ie3.simona.api.data.model.em.EmSetPoint;
 import edu.ie3.simona.api.mapping.ExtEntityMapping;
 import edu.ie3.util.quantities.PowerSystemUnits;
@@ -97,7 +97,7 @@ public class SimopsimUtils {
   }
 
   public static OpSimAggregatedSetPoints createAggregatedSetPoints(
-      ExtResultContainer container, Asset asset, Long delta, ExtEntityMapping mapping) {
+      ExtOutputContainer container, Asset asset, Long delta, ExtEntityMapping mapping) {
     List<OpSimSetPoint> osmSetPoints = new ArrayList<>(Collections.emptyList());
 
     Map<String, UUID> idToUuid = mapping.getExtId2UuidMapping();
@@ -105,7 +105,8 @@ public class SimopsimUtils {
     String gridId = asset.getGridAssetId();
     UUID id = idToUuid.get(gridId);
 
-    ResultEntity result = container.getResult(id);
+    // TODO: Fix this
+    ResultEntity result = container.getResult(id).getFirst();
 
     for (MeasurementValueType valueType : asset.getMeasurableQuantities()) {
       if (result instanceof SystemParticipantResult res) {
@@ -142,6 +143,7 @@ public class SimopsimUtils {
                 dataForSimona.add(
                     new EmSetPoint(
                         idToUuid.get(ossm.getAssetId()),
+                        idToUuid.get(ossm.getAssetId()),
                         new PValue(
                             Quantities.getQuantity(
                                 ose.getScheduledValue(), StandardUnits.ACTIVE_POWER_IN))));
@@ -154,7 +156,7 @@ public class SimopsimUtils {
   }
 
   public static List<OpSimAggregatedSetPoints> createSimopsimOutputList(
-      Set<Asset> writable, Long delta, ExtResultContainer container, ExtEntityMapping mapping) {
+      Set<Asset> writable, Long delta, ExtOutputContainer container, ExtEntityMapping mapping) {
     List<OpSimAggregatedSetPoints> osmAggSetPoints = new ArrayList<>(Collections.emptyList());
     writable.forEach(
         asset -> osmAggSetPoints.add(createAggregatedSetPoints(container, asset, delta, mapping)));
