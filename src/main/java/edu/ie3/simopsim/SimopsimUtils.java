@@ -11,24 +11,76 @@ import de.fhg.iwes.opsim.datamodel.generated.asset.Asset;
 import de.fhg.iwes.opsim.datamodel.generated.flexforecast.OpSimFlexibilityForecastMessage;
 import de.fhg.iwes.opsim.datamodel.generated.realtimedata.*;
 import edu.ie3.datamodel.models.StandardUnits;
+import edu.ie3.datamodel.models.input.AssetInput;
+import edu.ie3.datamodel.models.input.EmInput;
+import edu.ie3.datamodel.models.input.NodeInput;
+import edu.ie3.datamodel.models.input.container.JointGridContainer;
+import edu.ie3.datamodel.models.input.system.SystemParticipantInput;
 import edu.ie3.datamodel.models.result.ResultEntity;
 import edu.ie3.datamodel.models.result.system.SystemParticipantResult;
 import edu.ie3.datamodel.models.value.PValue;
 import edu.ie3.simona.api.data.container.ExtOutputContainer;
 import edu.ie3.simona.api.data.model.em.EmSetPoint;
+import edu.ie3.simona.api.mapping.DataType;
+import edu.ie3.simona.api.mapping.ExtEntityEntry;
 import edu.ie3.simona.api.mapping.ExtEntityMapping;
 import edu.ie3.util.quantities.PowerSystemUnits;
 import java.io.IOException;
 import java.util.*;
+import java.util.function.Consumer;
 import org.apache.logging.slf4j.SLF4JLogger;
 import org.joda.time.DateTime;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import tech.units.indriya.quantity.Quantities;
 
 /** Helpful methods to implement a SIMONA-OPSIM coupling. */
 public class SimopsimUtils {
 
+  private static final Logger log = LoggerFactory.getLogger(SimopsimUtils.class);
+
   private SimopsimUtils() {}
+
+  public static ExtEntityMapping buildMapping(JointGridContainer container) {
+    Map<EmInput, Set<NodeInput>> entities = new HashMap<>();
+
+    List<SystemParticipantInput> participants =
+        container.getSystemParticipants().allEntitiesAsList();
+
+    participants.forEach(
+        participant ->
+            participant
+                .getControllingEm()
+                .ifPresent(
+                    em -> {
+                      entities.putIfAbsent(em, new HashSet<>());
+                      entities.get(em).add(participant.getNode());
+                    }));
+
+    List<ExtEntityEntry> entries = new ArrayList<>();
+
+    entities.forEach(
+        (em, nodes) -> {
+          switch (nodes.size()) {
+            case 0 ->
+                throw new RuntimeException("No nodes found for EmInput '" + em.getId() + "'.");
+            case 1 -> {
+              String id = nodes.iterator().next().getId();
+              entries.add(new ExtEntityEntry(em.getUuid(), id, DataType.EM));
+            }
+            default ->
+                throw new RuntimeException(
+                    "Too many nodes found for EmInput '" + em.getId() + "'.");
+          }
+        });
+
+    Consumer<AssetInput> consumer =
+        asset -> entries.add(new ExtEntityEntry(asset.getUuid(), asset.getId(), DataType.RESULT));
+
+    participants.forEach(consumer);
+
+    return new ExtEntityMapping(entries);
+  }
 
   public static Client clientWithProxy(SimonaProxy proxy) throws IOException {
     SLF4JLogger logger = new SLF4JLogger("Client", LoggerFactory.getLogger(Client.class));
@@ -105,25 +157,30 @@ public class SimopsimUtils {
     String gridId = asset.getGridAssetId();
     UUID id = idToUuid.get(gridId);
 
-    // TODO: Fix this
-    ResultEntity result = container.getResult(id).getFirst();
+    List<ResultEntity> results = container.getResult(id);
 
-    for (MeasurementValueType valueType : asset.getMeasurableQuantities()) {
-      if (result instanceof SystemParticipantResult res) {
-        if (valueType.equals(MeasurementValueType.ACTIVE_POWER)) {
-          osmSetPoints.add(
-              new OpSimSetPoint(
-                  res.getP().to(PowerSystemUnits.MEGAWATT).getValue().doubleValue(),
-                  SetPointValueType.fromValue(valueType.value())));
+    if (results.isEmpty()) {
+      log.warn("No results received for asset '{}' in tick {}", id, container.getTick());
+    }
+
+    for (ResultEntity result : results) {
+      for (MeasurementValueType valueType : asset.getMeasurableQuantities()) {
+        if (result instanceof SystemParticipantResult res) {
+          if (valueType.equals(MeasurementValueType.ACTIVE_POWER)) {
+            osmSetPoints.add(
+                new OpSimSetPoint(
+                    res.getP().to(PowerSystemUnits.MEGAWATT).getValue().doubleValue(),
+                    SetPointValueType.fromValue(valueType.value())));
+          }
+          if (valueType.equals(MeasurementValueType.REACTIVE_POWER)) {
+            osmSetPoints.add(
+                new OpSimSetPoint(
+                    res.getQ().to(PowerSystemUnits.MEGAVAR).getValue().doubleValue(),
+                    SetPointValueType.fromValue(valueType.value())));
+          }
+        } else {
+          throw new RuntimeException("Expected system participant result!");
         }
-        if (valueType.equals(MeasurementValueType.REACTIVE_POWER)) {
-          osmSetPoints.add(
-              new OpSimSetPoint(
-                  res.getQ().to(PowerSystemUnits.MEGAVAR).getValue().doubleValue(),
-                  SetPointValueType.fromValue(valueType.value())));
-        }
-      } else {
-        throw new RuntimeException("Expected system participant result!");
       }
     }
     return new OpSimAggregatedSetPoints(asset.getGridAssetId(), delta, osmSetPoints);

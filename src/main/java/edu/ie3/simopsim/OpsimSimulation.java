@@ -52,12 +52,10 @@ public final class OpsimSimulation extends ExtCoSimulation {
             log);
 
     // result data connection
-    Map<DataType, List<UUID>> resultInput = new HashMap<>();
     List<UUID> results =
         mapping.getEntries(DataType.RESULT).stream().map(ExtEntityEntry::uuid).toList();
 
-    this.extResultDataConnection =
-        !results.isEmpty() ? buildResultConnection(resultInput, log) : null;
+    this.extResultDataConnection = !results.isEmpty() ? new ExtResultDataConnection(results) : null;
   }
 
   @Override

@@ -7,13 +7,8 @@
 package edu.ie3.simopsim;
 
 import de.fhg.iee.opsim.client.Client;
-import edu.ie3.datamodel.models.input.EmInput;
-import edu.ie3.datamodel.models.input.NodeInput;
-import edu.ie3.datamodel.models.input.container.JointGridContainer;
 import edu.ie3.simona.api.ExtLinkInterface;
 import edu.ie3.simona.api.exceptions.NoExtSimulationException;
-import edu.ie3.simona.api.mapping.DataType;
-import edu.ie3.simona.api.mapping.ExtEntityEntry;
 import edu.ie3.simona.api.mapping.ExtEntityMapping;
 import edu.ie3.simona.api.simulation.ExtSimAdapterData;
 import edu.ie3.simona.api.simulation.ExtSimulation;
@@ -23,7 +18,7 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
-import java.util.*;
+import java.util.Optional;
 import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,7 +44,7 @@ public class SimopsimExtLink implements ExtLinkInterface {
 
     Optional<String> urlToOpsim = arguments.urlToOpsim();
 
-    ExtEntityMapping mapping = buildMapping(data.getGrid());
+    ExtEntityMapping mapping = SimopsimUtils.buildMapping(data.getGrid());
 
     if (urlToOpsim.isPresent()) {
       InitializationQueue queue = new InitializationQueue();
@@ -70,41 +65,5 @@ public class SimopsimExtLink implements ExtLinkInterface {
       emSimulation = new OpsimSimulation("SIMONA Simulation", queue, mapping);
       emSimulation.setAdapterData(data);
     }
-  }
-
-  public ExtEntityMapping buildMapping(JointGridContainer container) {
-    Map<EmInput, List<NodeInput>> entities = new HashMap<>();
-
-    container
-        .getSystemParticipants()
-        .allEntitiesAsList()
-        .forEach(
-            participant ->
-                participant
-                    .getControllingEm()
-                    .ifPresent(
-                        em -> {
-                          entities.putIfAbsent(em, new ArrayList<>());
-                          entities.get(em).add(participant.getNode());
-                        }));
-
-    List<ExtEntityEntry> entries = new ArrayList<>();
-
-    entities.forEach(
-        (em, nodes) -> {
-          switch (nodes.size()) {
-            case 0 ->
-                throw new RuntimeException("No nodes found for EmInput '" + em.getId() + "'.");
-            case 1 -> {
-              String id = nodes.getFirst().getId();
-              entries.add(new ExtEntityEntry(em.getUuid(), id, DataType.EM));
-            }
-            default ->
-                throw new RuntimeException(
-                    "Too many nodes found for EmInput '" + em.getId() + "'.");
-          }
-        });
-
-    return new ExtEntityMapping(entries);
   }
 }
