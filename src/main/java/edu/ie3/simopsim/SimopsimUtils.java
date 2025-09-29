@@ -183,7 +183,7 @@ public class SimopsimUtils {
         }
       }
     }
-    return new OpSimAggregatedSetPoints(asset.getGridAssetId(), delta, osmSetPoints);
+    return new OpSimAggregatedSetPoints(gridId, delta, osmSetPoints);
   }
 
   public static List<EmSetPoint> createEmSetPoints(
@@ -197,10 +197,15 @@ public class SimopsimUtils {
             for (OpSimScheduleElement ose : ossm.getScheduleElements()) {
               if (ose.getScheduledValueType() == SetPointValueType.ACTIVE_POWER) {
 
+                String ossmId = ossm.getAssetId();
+                String id = ossmId.replace("/Schedule", "");
+                UUID uuid = idToUuid.get(id);
+                log.info("Id: {} ({}) -> UUID: {}", ossmId, id, uuid);
+
                 dataForSimona.add(
                     new EmSetPoint(
-                        idToUuid.get(ossm.getAssetId()),
-                        idToUuid.get(ossm.getAssetId()),
+                        uuid,
+                        uuid,
                         new PValue(
                             Quantities.getQuantity(
                                 ose.getScheduledValue(), StandardUnits.ACTIVE_POWER_IN))));

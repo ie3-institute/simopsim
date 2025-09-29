@@ -79,15 +79,19 @@ public final class OpsimSimulation extends ExtCoSimulation {
     long nextTick = tick + stepSize;
 
     try {
+      log.info("Get data from OpSim.");
       ExtInputContainer container = queueToSimona.takeContainer();
 
       Optional<Long> maybeNextTick = container.getMaybeNextTick();
-
       Map<UUID, EmSetPoint> emSetPoints = container.extractSetPoints();
 
+      log.info("Sending em set points to SIMONA.");
       sendEmSetPointsToSimona(extEmDataConnection, tick, emSetPoints, maybeNextTick, log);
+      log.info("Waiting for data from SIMONA.");
 
-      sendResultToExt(extResultDataConnection, tick, Optional.of(nextTick), log);
+      if (tick != 0) {
+        sendResultToExt(extResultDataConnection, tick, Optional.of(nextTick), log);
+      }
 
       log.info(
           "***** External simulation for tick {} completed. Next simulation tick = {} *****",

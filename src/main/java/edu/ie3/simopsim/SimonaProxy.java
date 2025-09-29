@@ -90,7 +90,7 @@ public final class SimonaProxy extends ConservativeSynchronizedProxy {
         for (AssetOperator ao : operators) {
           this.readable.addAll(ao.getReadableAssets());
           this.writable.addAll(ao.getControlledAssets());
-          this.delta = ao.getOperationInterval();
+          this.delta = ao.getOperationInterval() / 1000;
         }
 
         this.initTimeStep = cli.getClock().getActualTime().getMillis();
