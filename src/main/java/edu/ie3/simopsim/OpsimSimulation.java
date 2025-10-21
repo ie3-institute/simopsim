@@ -38,7 +38,7 @@ public final class OpsimSimulation extends ExtCoSimulation {
 
     try {
       InitializationData.SimulatorData data = queue.take(InitializationData.SimulatorData.class);
-      this.stepSize = data.stepSize();
+      this.stepSize = data.stepSize() / 1000;
       data.setConnectionToSimonaApi().accept(queueToSimona, queueToExt);
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
