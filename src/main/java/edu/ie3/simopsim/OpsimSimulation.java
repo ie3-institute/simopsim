@@ -13,7 +13,6 @@ import edu.ie3.simona.api.data.connection.ExtResultDataConnection;
 import edu.ie3.simona.api.data.container.ExtInputContainer;
 import edu.ie3.simona.api.data.model.em.EmSetPoint;
 import edu.ie3.simona.api.mapping.DataType;
-import edu.ie3.simona.api.mapping.ExtEntityEntry;
 import edu.ie3.simona.api.mapping.ExtEntityMapping;
 import edu.ie3.simona.api.simulation.ExtCoSimulation;
 import edu.ie3.simopsim.initialization.InitializationData;
@@ -45,16 +44,10 @@ public final class OpsimSimulation extends ExtCoSimulation {
       throw new RuntimeException(e);
     }
 
-    this.extEmDataConnection =
-        buildEmConnection(
-            mapping.getEntries(DataType.EM).stream().map(ExtEntityEntry::uuid).toList(),
-            EmMode.BASE,
-            log);
+    this.extEmDataConnection = buildEmConnection(mapping.getAssets(DataType.EM), EmMode.BASE, log);
 
     // result data connection
-    List<UUID> results =
-        mapping.getEntries(DataType.RESULT).stream().map(ExtEntityEntry::uuid).toList();
-
+    List<UUID> results = mapping.getAssets(DataType.RESULT);
     this.extResultDataConnection = !results.isEmpty() ? new ExtResultDataConnection(results) : null;
   }
 
@@ -89,9 +82,7 @@ public final class OpsimSimulation extends ExtCoSimulation {
       sendEmSetPointsToSimona(extEmDataConnection, tick, emSetPoints, maybeNextTick, log);
       log.info("Waiting for data from SIMONA.");
 
-      if (tick != 0) {
-        sendResultToExt(extResultDataConnection, tick, Optional.of(nextTick), log);
-      }
+      sendResultToExt(extResultDataConnection, tick, Optional.of(nextTick), log);
 
       log.info(
           "***** External simulation for tick {} completed. Next simulation tick = {} *****",

@@ -8,9 +8,9 @@ package edu.ie3.simopsim;
 
 import de.fhg.iee.opsim.client.Client;
 import edu.ie3.simona.api.ExtLinkInterface;
+import edu.ie3.simona.api.data.ExtSimAdapterData;
 import edu.ie3.simona.api.exceptions.NoExtSimulationException;
 import edu.ie3.simona.api.mapping.ExtEntityMapping;
-import edu.ie3.simona.api.simulation.ExtSimAdapterData;
 import edu.ie3.simona.api.simulation.ExtSimulation;
 import edu.ie3.simopsim.config.ArgsParser;
 import edu.ie3.simopsim.initialization.InitializationQueue;

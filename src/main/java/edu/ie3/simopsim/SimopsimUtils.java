@@ -152,10 +152,8 @@ public class SimopsimUtils {
       ExtOutputContainer container, Asset asset, Long delta, ExtEntityMapping mapping) {
     List<OpSimSetPoint> osmSetPoints = new ArrayList<>(Collections.emptyList());
 
-    Map<String, UUID> idToUuid = mapping.getExtId2UuidMapping();
-
     String gridId = asset.getGridAssetId();
-    UUID id = idToUuid.get(gridId);
+    UUID id = mapping.from(gridId);
 
     List<ResultEntity> results = container.getResult(id);
 
@@ -189,7 +187,6 @@ public class SimopsimUtils {
   public static List<EmSetPoint> createEmSetPoints(
       Queue<OpSimMessage> inputFromClient, ExtEntityMapping mapping) {
     List<EmSetPoint> dataForSimona = new ArrayList<>();
-    Map<String, UUID> idToUuid = mapping.getExtId2UuidMapping();
 
     inputFromClient.forEach(
         osm -> {
@@ -199,12 +196,11 @@ public class SimopsimUtils {
 
                 String ossmId = ossm.getAssetId();
                 String id = ossmId.replace("/Schedule", "");
-                UUID uuid = idToUuid.get(id);
+                UUID uuid = mapping.from(id);
                 log.info("Id: {} ({}) -> UUID: {}", ossmId, id, uuid);
 
                 dataForSimona.add(
                     new EmSetPoint(
-                        uuid,
                         uuid,
                         new PValue(
                             Quantities.getQuantity(
