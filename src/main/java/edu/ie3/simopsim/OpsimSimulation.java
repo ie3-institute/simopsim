@@ -14,6 +14,7 @@ import edu.ie3.simona.api.data.container.ExtInputContainer;
 import edu.ie3.simona.api.data.model.em.EmSetPoint;
 import edu.ie3.simona.api.mapping.DataType;
 import edu.ie3.simona.api.mapping.ExtEntityMapping;
+import edu.ie3.simona.api.ontology.em.EmCompletion;
 import edu.ie3.simona.api.simulation.ExtCoSimulation;
 import edu.ie3.simopsim.initialization.InitializationData;
 import edu.ie3.simopsim.initialization.InitializationQueue;
@@ -28,6 +29,8 @@ public final class OpsimSimulation extends ExtCoSimulation {
   private static final Logger log = LoggerFactory.getLogger(OpsimSimulation.class);
 
   private final long stepSize;
+  private long lastTick = -1;
+  private long nextExtTick = 0L;
 
   private final ExtEmDataConnection extEmDataConnection;
   private final ExtResultDataConnection extResultDataConnection;
@@ -70,27 +73,49 @@ public final class OpsimSimulation extends ExtCoSimulation {
     log.info("+++++ External simulation triggered for tick {} +++++", tick);
 
     long nextTick = tick + stepSize;
+    Optional<Long> maybeNextTick = Optional.of(nextExtTick);
 
     try {
-      log.info("Get data from OpSim.");
-      ExtInputContainer container = queueToSimona.takeContainer();
+      if (tick < nextExtTick && tick > lastTick) {
+        extEmDataConnection.simulateInternal(tick);
+        log.info("Simulate internal for tick: {}", tick);
+      } else if (tick == lastTick) {
+        return maybeNextTick;
+      } else {
+        log.info("Get data from OpSim.");
+        ExtInputContainer container = queueToSimona.takeContainer();
+        Map<UUID, EmSetPoint> emSetPoints = container.extractSetPoints();
 
-      Optional<Long> maybeNextTick = container.getMaybeNextTick();
-      Map<UUID, EmSetPoint> emSetPoints = container.extractSetPoints();
+        log.info("Sending em set points to SIMONA.");
+        extEmDataConnection.sendEmData(tick, emSetPoints, log);
 
-      log.info("Sending em set points to SIMONA.");
-      sendEmSetPointsToSimona(extEmDataConnection, tick, emSetPoints, maybeNextTick, log);
-      log.info("Waiting for data from SIMONA.");
+        log.info("Waiting for data from SIMONA.");
+        sendResultToExt(extResultDataConnection, tick, maybeNextTick, log);
 
-      sendResultToExt(extResultDataConnection, tick, Optional.of(nextTick), log);
+        log.info(
+                "***** External simulation for tick {} completed. Next simulation tick = {} *****",
+                tick,
+                nextTick);
 
-      log.info(
-          "***** External simulation for tick {} completed. Next simulation tick = {} *****",
-          tick,
-          nextTick);
+        nextExtTick = nextTick;
+      }
+
+      Optional<Long> nextEmTick = extEmDataConnection.receiveWithType(EmCompletion.class).maybeNextTick();
+      log.info("Next em tick: {}", nextEmTick);
+
+      if (nextEmTick.isPresent()) {
+        long emTick = nextEmTick.get();
+
+        if (emTick != tick && emTick < nextExtTick) {
+          maybeNextTick = nextEmTick;
+        }
+      }
+
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
-    return Optional.of(nextTick);
+
+    lastTick = tick;
+    return maybeNextTick;
   }
 }
