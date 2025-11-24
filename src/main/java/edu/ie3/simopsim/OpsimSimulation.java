@@ -93,14 +93,15 @@ public final class OpsimSimulation extends ExtCoSimulation {
         sendResultToExt(extResultDataConnection, tick, maybeNextTick, log);
 
         log.info(
-                "***** External simulation for tick {} completed. Next simulation tick = {} *****",
-                tick,
-                nextTick);
+            "***** External simulation for tick {} completed. Next simulation tick = {} *****",
+            tick,
+            nextTick);
 
         nextExtTick = nextTick;
       }
 
-      Optional<Long> nextEmTick = extEmDataConnection.receiveWithType(EmCompletion.class).maybeNextTick();
+      Optional<Long> nextEmTick =
+          extEmDataConnection.receiveWithType(EmCompletion.class).maybeNextTick();
       log.info("Next em tick: {}", nextEmTick);
 
       if (nextEmTick.isPresent()) {
