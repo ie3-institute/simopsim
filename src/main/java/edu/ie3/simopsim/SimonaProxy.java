@@ -49,10 +49,18 @@ public final class SimonaProxy extends ConservativeSynchronizedProxy {
   public ExtDataContainerQueue<ExtInputContainer> queueToSIMONA;
   public ExtDataContainerQueue<ExtOutputContainer> queueToOpSim;
   private final ExtEntityMapping mapping;
+  private final Map<UUID, List<UUID>> nodeToParticipants;
+  private final Map<UUID, UUID> participantToNode;
 
-  public SimonaProxy(InitializationQueue queue, ExtEntityMapping mapping) {
+  public SimonaProxy(
+      InitializationQueue queue,
+      ExtEntityMapping mapping,
+      Map<UUID, List<UUID>> nodeToParticipants,
+      Map<UUID, UUID> participantToNode) {
     this.queue = queue;
     this.mapping = mapping;
+    this.nodeToParticipants = nodeToParticipants;
+    this.participantToNode = participantToNode;
   }
 
   public void setConnectionToSimonaApi(
@@ -155,7 +163,12 @@ public final class SimonaProxy extends ConservativeSynchronizedProxy {
             "Send Aggregated SetPoints for {}", this.cli.getCurrentSimulationTime().toString());
         List<OpSimAggregatedSetPoints> osmAggSetPoints =
             SimopsimUtils.createSimopsimOutputList(
-                writable, cli.getClock().getActualTime().plus(delta).getMillis(), results, mapping);
+                writable,
+                cli.getClock().getActualTime().plus(delta).getMillis(),
+                results,
+                mapping,
+                nodeToParticipants,
+                participantToNode);
 
         printMsg(osmAggSetPoints);
         sendToOpSim(osmAggSetPoints);

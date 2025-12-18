@@ -7,8 +7,10 @@
 package edu.ie3.simopsim;
 
 import de.fhg.iee.opsim.client.Client;
+import edu.ie3.datamodel.models.input.container.SystemParticipants;
+import edu.ie3.datamodel.models.input.system.SystemParticipantInput;
 import edu.ie3.simona.api.ExtLinkInterface;
-import edu.ie3.simona.api.data.ExtSimAdapterData;
+import edu.ie3.simona.api.data.SetupData;
 import edu.ie3.simona.api.exceptions.NoExtSimulationException;
 import edu.ie3.simona.api.mapping.ExtEntityMapping;
 import edu.ie3.simona.api.simulation.ExtSimulation;
@@ -18,7 +20,7 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,18 +41,33 @@ public class SimopsimExtLink implements ExtLinkInterface {
   }
 
   @Override
-  public void setup(ExtSimAdapterData data) {
-    ArgsParser.Arguments arguments = ArgsParser.parse(data.getMainArgs());
+  public void setup(SetupData data) {
+    ArgsParser.Arguments arguments = ArgsParser.parse(data.mainArgs());
 
     Optional<String> urlToOpsim = arguments.urlToOpsim();
 
-    ExtEntityMapping mapping = SimopsimUtils.buildMapping(data.getGrid());
+    SystemParticipants systemParticipants = data.gridContainer().getSystemParticipants();
+
+    List<SystemParticipantInput> participants = systemParticipants.allEntitiesAsList();
+
+    Map<UUID, UUID> participantToNode = new HashMap<>();
+    Map<UUID, List<UUID>> nodeToParticipants = new HashMap<>();
+
+    participants.forEach(
+        participant -> {
+          UUID uuid = participant.getUuid();
+          UUID nodeInput = participant.getNode().getUuid();
+          participantToNode.put(uuid, nodeInput);
+          nodeToParticipants.computeIfAbsent(nodeInput, n -> new ArrayList<>()).add(uuid);
+        });
+
+    ExtEntityMapping mapping = SimopsimUtils.buildMapping(participants);
 
     if (urlToOpsim.isPresent()) {
       InitializationQueue queue = new InitializationQueue();
 
       try {
-        SimonaProxy proxy = new SimonaProxy(queue, mapping);
+        SimonaProxy proxy = new SimonaProxy(queue, mapping, nodeToParticipants, participantToNode);
         Client client = SimopsimUtils.clientWithProxy(proxy);
         client.start(urlToOpsim.get());
         log.info("Connected to: {}", urlToOpsim);
@@ -63,7 +80,7 @@ public class SimopsimExtLink implements ExtLinkInterface {
       }
 
       emSimulation = new OpsimSimulation("SIMONA Simulation", queue, mapping);
-      emSimulation.setAdapterData(data);
+      emSimulation.setSetupData(data);
     }
   }
 }

@@ -14,7 +14,6 @@ import edu.ie3.datamodel.models.StandardUnits;
 import edu.ie3.datamodel.models.input.AssetInput;
 import edu.ie3.datamodel.models.input.EmInput;
 import edu.ie3.datamodel.models.input.NodeInput;
-import edu.ie3.datamodel.models.input.container.JointGridContainer;
 import edu.ie3.datamodel.models.input.system.SystemParticipantInput;
 import edu.ie3.datamodel.models.result.ResultEntity;
 import edu.ie3.datamodel.models.result.system.SystemParticipantResult;
@@ -28,6 +27,8 @@ import edu.ie3.util.quantities.PowerSystemUnits;
 import java.io.IOException;
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
+
 import org.apache.logging.slf4j.SLF4JLogger;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
@@ -41,21 +42,18 @@ public class SimopsimUtils {
 
   private SimopsimUtils() {}
 
-  public static ExtEntityMapping buildMapping(JointGridContainer container) {
+  public static ExtEntityMapping buildMapping(List<SystemParticipantInput> participants) {
     Map<EmInput, Set<NodeInput>> entities = new HashMap<>();
-
-    List<SystemParticipantInput> participants =
-        container.getSystemParticipants().allEntitiesAsList();
 
     participants.forEach(
         participant ->
             participant
                 .getControllingEm()
                 .ifPresent(
-                    em -> {
-                      entities.putIfAbsent(em, new HashSet<>());
-                      entities.get(em).add(participant.getNode());
-                    }));
+                    em ->
+                        entities
+                            .computeIfAbsent(em, x -> new HashSet<>())
+                            .add(participant.getNode())));
 
     List<ExtEntityEntry> entries = new ArrayList<>();
 
@@ -149,38 +147,50 @@ public class SimopsimUtils {
   }
 
   public static OpSimAggregatedSetPoints createAggregatedSetPoints(
-      ExtOutputContainer container, Asset asset, Long delta, ExtEntityMapping mapping) {
+      ExtOutputContainer container,
+      Asset asset,
+      Long delta,
+      ExtEntityMapping mapping,
+      Map<UUID, List<UUID>> nodeToParticipants,
+      Map<UUID, UUID> participantToNode) {
     List<OpSimSetPoint> osmSetPoints = new ArrayList<>(Collections.emptyList());
 
     String gridId = asset.getGridAssetId();
     UUID id = mapping.from(gridId);
 
-    List<ResultEntity> results = container.getResult(id);
+    List<ResultEntity> results = new ArrayList<>();
+    nodeToParticipants
+        .getOrDefault(participantToNode.get(id), Collections.emptyList())
+        .forEach(uuid -> results.addAll(container.getResult(uuid)));
 
     if (results.isEmpty()) {
       log.warn("No results received for asset '{}' in tick {}", id, container.getTick());
+    } else {
+        log.warn("Results for '{}': {}", gridId, results.stream().map(ResultEntity::getInputModel).collect(Collectors.toSet()));
     }
 
-    for (ResultEntity result : results) {
-      for (MeasurementValueType valueType : asset.getMeasurableQuantities()) {
+    for (MeasurementValueType valueType : asset.getMeasurableQuantities()) {
+      double p = 0d;
+      double q = 0d;
+
+      for (ResultEntity result : results) {
         if (result instanceof SystemParticipantResult res) {
-          if (valueType.equals(MeasurementValueType.ACTIVE_POWER)) {
-            osmSetPoints.add(
-                new OpSimSetPoint(
-                    res.getP().to(PowerSystemUnits.MEGAWATT).getValue().doubleValue(),
-                    SetPointValueType.fromValue(valueType.value())));
-          }
-          if (valueType.equals(MeasurementValueType.REACTIVE_POWER)) {
-            osmSetPoints.add(
-                new OpSimSetPoint(
-                    res.getQ().to(PowerSystemUnits.MEGAVAR).getValue().doubleValue(),
-                    SetPointValueType.fromValue(valueType.value())));
-          }
+          p += res.getP().to(PowerSystemUnits.MEGAWATT).getValue().doubleValue();
+          q += res.getQ().to(PowerSystemUnits.MEGAVAR).getValue().doubleValue();
         } else {
           throw new RuntimeException("Expected system participant result!");
         }
       }
+
+      if (valueType.equals(MeasurementValueType.ACTIVE_POWER)) {
+        osmSetPoints.add(new OpSimSetPoint(p, SetPointValueType.fromValue(valueType.value())));
+      }
+
+      if (valueType.equals(MeasurementValueType.REACTIVE_POWER)) {
+        osmSetPoints.add(new OpSimSetPoint(q, SetPointValueType.fromValue(valueType.value())));
+      }
     }
+
     return new OpSimAggregatedSetPoints(gridId, delta, osmSetPoints);
   }
 
@@ -214,10 +224,18 @@ public class SimopsimUtils {
   }
 
   public static List<OpSimAggregatedSetPoints> createSimopsimOutputList(
-      Set<Asset> writable, Long delta, ExtOutputContainer container, ExtEntityMapping mapping) {
+      Set<Asset> writable,
+      Long delta,
+      ExtOutputContainer container,
+      ExtEntityMapping mapping,
+      Map<UUID, List<UUID>> nodeToParticipants,
+      Map<UUID, UUID> participantToNode) {
     List<OpSimAggregatedSetPoints> osmAggSetPoints = new ArrayList<>(Collections.emptyList());
     writable.forEach(
-        asset -> osmAggSetPoints.add(createAggregatedSetPoints(container, asset, delta, mapping)));
+        asset ->
+            osmAggSetPoints.add(
+                createAggregatedSetPoints(
+                    container, asset, delta, mapping, nodeToParticipants, participantToNode)));
     return osmAggSetPoints;
   }
 }
