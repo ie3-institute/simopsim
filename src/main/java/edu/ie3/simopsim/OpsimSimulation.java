@@ -6,11 +6,13 @@
 
 package edu.ie3.simopsim;
 
+import edu.ie3.datamodel.models.result.ResultEntity;
 import edu.ie3.simona.api.data.connection.ExtDataConnection;
 import edu.ie3.simona.api.data.connection.ExtEmDataConnection;
 import edu.ie3.simona.api.data.connection.ExtEmDataConnection.EmMode;
 import edu.ie3.simona.api.data.connection.ExtResultDataConnection;
 import edu.ie3.simona.api.data.container.ExtInputContainer;
+import edu.ie3.simona.api.data.container.ExtOutputContainer;
 import edu.ie3.simona.api.data.model.em.EmSetPoint;
 import edu.ie3.simona.api.mapping.DataType;
 import edu.ie3.simona.api.mapping.ExtEntityMapping;
@@ -90,7 +92,11 @@ public final class OpsimSimulation extends ExtCoSimulation {
         extEmDataConnection.sendEmData(tick, emSetPoints, log);
 
         log.info("Waiting for data from SIMONA.");
-        sendResultToExt(extResultDataConnection, tick, maybeNextTick, log);
+
+        Map<UUID, List<ResultEntity>> resultsToBeSend = extResultDataConnection.requestResults(tick);
+        ExtOutputContainer outputContainer = new ExtOutputContainer(tick, maybeNextTick);
+          outputContainer.addResults(resultsToBeSend);
+        queueToExt.queueData(outputContainer);
 
         log.info(
             "***** External simulation for tick {} completed. Next simulation tick = {} *****",
