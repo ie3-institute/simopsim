@@ -104,12 +104,6 @@ public final class SimonaProxy extends ConservativeSynchronizedProxy {
         this.initTimeStep = cli.getClock().getActualTime().getMillis();
         this.lastTimeStep = initTimeStep;
 
-        logger.info(
-            "Component {}, got Readables: {}, Writables: {} and Delta: {}",
-            new Object[] {
-              this.componentDescription, this.readable.size(), this.writable.size(), this.delta
-            });
-
         queue.put(new InitializationData.SimulatorData(delta, this::setConnectionToSimonaApi));
 
         return true;

@@ -28,7 +28,6 @@ import java.io.IOException;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
-
 import org.apache.logging.slf4j.SLF4JLogger;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
@@ -166,7 +165,10 @@ public class SimopsimUtils {
     if (results.isEmpty()) {
       log.warn("No results received for asset '{}' in tick {}", id, container.getTick());
     } else {
-        log.warn("Results for '{}': {}", gridId, results.stream().map(ResultEntity::getInputModel).collect(Collectors.toSet()));
+      log.warn(
+          "Results for '{}': {}",
+          gridId,
+          results.stream().map(ResultEntity::getInputModel).collect(Collectors.toSet()));
     }
 
     for (MeasurementValueType valueType : asset.getMeasurableQuantities()) {

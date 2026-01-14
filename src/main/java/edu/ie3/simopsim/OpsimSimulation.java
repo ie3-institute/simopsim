@@ -93,9 +93,10 @@ public final class OpsimSimulation extends ExtCoSimulation {
 
         log.info("Waiting for data from SIMONA.");
 
-        Map<UUID, List<ResultEntity>> resultsToBeSend = extResultDataConnection.requestResults(tick);
+        Map<UUID, List<ResultEntity>> resultsToBeSend =
+            extResultDataConnection.requestResults(tick);
         ExtOutputContainer outputContainer = new ExtOutputContainer(tick, maybeNextTick);
-          outputContainer.addResults(resultsToBeSend);
+        outputContainer.addResults(resultsToBeSend);
         queueToExt.queueData(outputContainer);
 
         log.info(
