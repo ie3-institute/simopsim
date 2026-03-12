@@ -17,34 +17,30 @@ import edu.ie3.simona.api.data.model.em.EmSetPoint;
 import edu.ie3.simona.api.mapping.DataType;
 import edu.ie3.simona.api.mapping.ExtEntityMapping;
 import edu.ie3.simona.api.ontology.em.EmCompletion;
+import edu.ie3.simona.api.simulation.ExtCoSimFramework;
 import edu.ie3.simona.api.simulation.ExtCoSimulation;
-import edu.ie3.simopsim.initialization.InitializationData;
-import edu.ie3.simopsim.initialization.InitializationQueue;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-public final class OpsimSimulation extends ExtCoSimulation {
-
-  private static final Logger log = LoggerFactory.getLogger(OpsimSimulation.class);
+public final class OpsimSimulation extends ExtCoSimulation<InitializationData> {
 
   private final long stepSize;
-  private long lastTick = -1;
-  private long nextExtTick = 0L;
 
   private final ExtEmDataConnection extEmDataConnection;
   private final ExtResultDataConnection extResultDataConnection;
 
   public OpsimSimulation(
-      String simulationName, InitializationQueue queue, ExtEntityMapping mapping) {
-    super(simulationName, "SimonaProxy");
+      String simulationName,
+      ExtCoSimFramework<InitializationData> extCoSimFramework,
+      ExtEntityMapping mapping) {
+    super(simulationName, extCoSimFramework);
 
     try {
-      InitializationData.SimulatorData data = queue.take(InitializationData.SimulatorData.class);
-      this.stepSize = data.stepSize() / 1000;
-      data.setConnectionToSimonaApi().accept(queueToSimona, queueToExt);
+      InitializationData.SimulatorData data = getInitData(InitializationData.SimulatorData.class);
+      this.stepSize = data.stepSize();
+      log.info("Step size: {}", stepSize);
+
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
@@ -64,66 +60,71 @@ public final class OpsimSimulation extends ExtCoSimulation {
   }
 
   @Override
-  protected Long initialize() {
+  protected long initialize() {
     log.info(
         "+++++++++++++++++++++++++++ initialization of the external simulation +++++++++++++++++++++++++++");
     return 0L;
   }
 
   @Override
-  protected Optional<Long> doActivity(long tick) {
-    log.info("+++++ External simulation triggered for tick {} +++++", tick);
+  public ExtOutputContainer handleExternalData(ExtInputContainer inputData)
+      throws InterruptedException {
+    long tick = inputData.getTick();
+    long nextTick = determineNextTick(tick);
+    OptionalLong maybeNextTick = OptionalLong.of(nextTick);
 
-    long nextTick = tick + stepSize;
-    Optional<Long> maybeNextTick = Optional.of(nextExtTick);
+    log.info("Get data from OpSim.");
+    Map<UUID, EmSetPoint> emSetPoints = inputData.extractSetPoints();
 
-    try {
-      if (tick < nextExtTick && tick > lastTick) {
-        extEmDataConnection.simulateInternal(tick);
-        log.info("Simulate internal for tick: {}", tick);
-      } else if (tick == lastTick) {
-        return maybeNextTick;
-      } else {
-        log.info("Get data from OpSim.");
-        ExtInputContainer container = queueToSimona.takeContainer();
-        Map<UUID, EmSetPoint> emSetPoints = container.extractSetPoints();
+    log.info("Sending em set points to SIMONA.");
+    extEmDataConnection.sendEmData(tick, emSetPoints, log);
 
-        log.info("Sending em set points to SIMONA.");
-        extEmDataConnection.sendEmData(tick, emSetPoints, log);
+    OptionalLong nextEmTick =
+        extEmDataConnection.receiveWithType(EmCompletion.class).maybeNextTick();
+    log.info("Next em tick: {}", nextEmTick);
+    maybeNextTick = getNextTickOption(maybeNextTick, nextEmTick);
+    log.info("Next SIMONA tick: {}", maybeNextTick);
 
-        log.info("Waiting for data from SIMONA.");
+    log.info("Waiting for data from SIMONA.");
+    Map<UUID, List<ResultEntity>> resultsToBeSend =
+        extResultDataConnection.requestResults(tick, true);
+    ExtOutputContainer outputContainer = new ExtOutputContainer(tick, maybeNextTick);
+    outputContainer.addResults(resultsToBeSend);
 
-        Map<UUID, List<ResultEntity>> resultsToBeSend =
-            extResultDataConnection.requestResults(tick);
-        ExtOutputContainer outputContainer = new ExtOutputContainer(tick, maybeNextTick);
-        outputContainer.addResults(resultsToBeSend);
-        queueToExt.queueData(outputContainer);
+    return outputContainer;
+  }
 
-        log.info(
-            "***** External simulation for tick {} completed. Next simulation tick = {} *****",
-            tick,
-            nextTick);
+  @Override
+  public ExtOutputContainer handleNoExternalData(long tick) {
+    extEmDataConnection.simulateInternal(tick);
+    log.info("Simulate internal for tick: {}", tick);
 
-        nextExtTick = nextTick;
-      }
+    return null;
+  }
 
-      Optional<Long> nextEmTick =
-          extEmDataConnection.receiveWithType(EmCompletion.class).maybeNextTick();
-      log.info("Next em tick: {}", nextEmTick);
+  @Override
+  public OptionalLong handleSimonaIsBehind(long tick, long extTick) throws InterruptedException {
+    extEmDataConnection.simulateInternal(tick);
+    OptionalLong nextEmTick = extEmDataConnection.receiveWithType(EmCompletion.class).maybeNextTick();
 
-      if (nextEmTick.isPresent()) {
-        long emTick = nextEmTick.get();
+    log.info("Simulate internal for tick: {}. Next em tick: {}", tick, nextEmTick);
 
-        if (emTick != tick && emTick < nextExtTick) {
-          maybeNextTick = nextEmTick;
-        }
-      }
+    return getNextTickOption(OptionalLong.of(extTick), nextEmTick);
+  }
 
-    } catch (InterruptedException e) {
-      throw new RuntimeException(e);
-    }
+  @Override
+  public void finishSimulation(long tick) {
+    // not needed currently
+  }
 
-    lastTick = tick;
-    return maybeNextTick;
+  @Override
+  public long determineNextTick(long tick) {
+    return tick + stepSize;
+  }
+
+  @Override
+  public boolean continueActivity(long tick) {
+    // false, since we don't need to loop the activity.
+    return false;
   }
 }

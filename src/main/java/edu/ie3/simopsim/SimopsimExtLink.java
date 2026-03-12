@@ -14,8 +14,6 @@ import edu.ie3.simona.api.data.SetupData;
 import edu.ie3.simona.api.exceptions.NoExtSimulationException;
 import edu.ie3.simona.api.mapping.ExtEntityMapping;
 import edu.ie3.simona.api.simulation.ExtSimulation;
-import edu.ie3.simopsim.config.ArgsParser;
-import edu.ie3.simopsim.initialization.InitializationQueue;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.security.KeyManagementException;
@@ -42,7 +40,7 @@ public class SimopsimExtLink implements ExtLinkInterface {
 
   @Override
   public void setup(SetupData data) {
-    ArgsParser.Arguments arguments = ArgsParser.parse(data.mainArgs());
+    ArgsParser.Arguments arguments = ArgsParser.parse(data.config());
 
     Optional<String> urlToOpsim = arguments.urlToOpsim();
 
@@ -64,22 +62,26 @@ public class SimopsimExtLink implements ExtLinkInterface {
     ExtEntityMapping mapping = SimopsimUtils.buildMapping(participants);
 
     if (urlToOpsim.isPresent()) {
-      InitializationQueue queue = new InitializationQueue();
+      SimonaProxy proxy = new SimonaProxy(mapping, nodeToParticipants, participantToNode);
 
-      try {
-        SimonaProxy proxy = new SimonaProxy(queue, mapping, nodeToParticipants, participantToNode);
-        Client client = SimopsimUtils.clientWithProxy(proxy);
-        client.start(urlToOpsim.get());
-        log.info("Connected to: {}", urlToOpsim);
-      } catch (IOException
-          | URISyntaxException
-          | NoSuchAlgorithmException
-          | KeyManagementException
-          | TimeoutException e) {
-        throw new RuntimeException(e);
-      }
+      new Thread("helper") {
+        @Override
+        public void run() {
+          try {
+            Client client = SimopsimUtils.clientWithProxy(proxy);
+            client.start(urlToOpsim.get());
+          } catch (IOException
+              | URISyntaxException
+              | NoSuchAlgorithmException
+              | KeyManagementException
+              | TimeoutException e) {
+            throw new RuntimeException(e);
+          }
+          log.info("Connected to: {}", urlToOpsim.get());
+        }
+      }.start();
 
-      emSimulation = new OpsimSimulation("SIMONA Simulation", queue, mapping);
+      emSimulation = new OpsimSimulation("SIMONA Simulation", proxy, mapping);
       emSimulation.setSetupData(data);
     }
   }

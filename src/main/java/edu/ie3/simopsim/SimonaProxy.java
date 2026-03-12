@@ -6,15 +6,12 @@
 
 package edu.ie3.simopsim;
 
-import static de.fhg.iwes.opsim.datamodel.generated.realtimedata.MeasurementValueType.*;
-
 import de.fhg.iee.opsim.DAO.AssetComparator;
 import de.fhg.iee.opsim.DAO.ProxyConfigDAO;
 import de.fhg.iee.opsim.abstracts.ConservativeSynchronizedProxy;
 import de.fhg.iee.opsim.interfaces.ClientInterface;
 import de.fhg.iwes.opsim.datamodel.generated.asset.Asset;
 import de.fhg.iwes.opsim.datamodel.generated.assetoperator.AssetOperator;
-import de.fhg.iwes.opsim.datamodel.generated.realtimedata.MeasurementValueType;
 import de.fhg.iwes.opsim.datamodel.generated.realtimedata.OpSimAggregatedSetPoints;
 import de.fhg.iwes.opsim.datamodel.generated.realtimedata.OpSimMessage;
 import de.fhg.iwes.opsim.datamodel.generated.scenarioconfig.ScenarioConfig;
@@ -22,16 +19,15 @@ import edu.ie3.simona.api.data.ExtDataContainerQueue;
 import edu.ie3.simona.api.data.container.ExtInputContainer;
 import edu.ie3.simona.api.data.container.ExtOutputContainer;
 import edu.ie3.simona.api.data.model.em.EmSetPoint;
-import edu.ie3.simona.api.mapping.DataType;
 import edu.ie3.simona.api.mapping.ExtEntityMapping;
-import edu.ie3.simopsim.initialization.InitializationData;
-import edu.ie3.simopsim.initialization.InitializationQueue;
+import edu.ie3.simona.api.simulation.ExtCoSimFramework;
 import java.util.*;
 import javax.xml.bind.JAXBException;
 import org.apache.logging.log4j.Logger;
 
 /** Class that extends the Proxy interface of OPSIM */
-public final class SimonaProxy extends ConservativeSynchronizedProxy {
+public final class SimonaProxy extends ConservativeSynchronizedProxy
+    implements ExtCoSimFramework<InitializationData> {
 
   private Logger logger;
   private ClientInterface cli;
@@ -39,35 +35,30 @@ public final class SimonaProxy extends ConservativeSynchronizedProxy {
 
   private long delta = -1L;
   private long lastTimeStep = 0L;
+  private long startTime;
 
   private long initTimeStep = 0L;
   private final Set<Asset> readable = new TreeSet<>(new AssetComparator());
   private final Set<Asset> writable = new TreeSet<>(new AssetComparator());
 
-  private final InitializationQueue queue;
+  private Queue<InitializationData> queue;
+  private final TickConverter converter = new TickConverter(0.001);
 
-  public ExtDataContainerQueue<ExtInputContainer> queueToSIMONA;
-  public ExtDataContainerQueue<ExtOutputContainer> queueToOpSim;
   private final ExtEntityMapping mapping;
   private final Map<UUID, List<UUID>> nodeToParticipants;
   private final Map<UUID, UUID> participantToNode;
 
+  private final ExtDataContainerQueue<ExtInputContainer> inputQueue = new ExtDataContainerQueue<>();
+  private final ExtDataContainerQueue<ExtOutputContainer> outputQueue =
+      new ExtDataContainerQueue<>();
+
   public SimonaProxy(
-      InitializationQueue queue,
       ExtEntityMapping mapping,
       Map<UUID, List<UUID>> nodeToParticipants,
       Map<UUID, UUID> participantToNode) {
-    this.queue = queue;
     this.mapping = mapping;
     this.nodeToParticipants = nodeToParticipants;
     this.participantToNode = participantToNode;
-  }
-
-  public void setConnectionToSimonaApi(
-      ExtDataContainerQueue<ExtInputContainer> queueToSIMONA,
-      ExtDataContainerQueue<ExtOutputContainer> queueToOpSim) {
-    this.queueToSIMONA = queueToSIMONA;
-    this.queueToOpSim = queueToOpSim;
   }
 
   @Override
@@ -103,15 +94,14 @@ public final class SimonaProxy extends ConservativeSynchronizedProxy {
 
         this.initTimeStep = cli.getClock().getActualTime().getMillis();
         this.lastTimeStep = initTimeStep;
+        this.startTime = cli.getCurrentSimulationTime().getMillis();
 
-        queue.put(new InitializationData.SimulatorData(delta, this::setConnectionToSimonaApi));
+        // necessary to wait for SIMONA
+        queue.add(new InitializationData.SimulatorData(converter.toSimonaTick(delta)));
 
         return true;
       } catch (JAXBException ex) {
         logger.error("Problem with the Config Data not right format and or incomplete. ", ex);
-        return false;
-      } catch (InterruptedException e) {
-        logger.error("Could not send init data to SIMONA.", e);
         return false;
       }
     } else {
@@ -127,30 +117,32 @@ public final class SimonaProxy extends ConservativeSynchronizedProxy {
         cli.getClock().getActualTime().getMillis(),
         cli.getCurrentSimulationTime());
 
+    long currentTick = cli.getCurrentSimulationTime().getMillis() - startTime;
+
     if (timeStep == this.initTimeStep
         || (timeStep < this.lastTimeStep + this.delta && timeStep != this.lastTimeStep)) {
       return null;
     } else {
       // Get message from external
       this.lastTimeStep = timeStep;
+
       try {
         logger.info("Received messages for {}", this.cli.getCurrentSimulationTime().toString());
         List<EmSetPoint> dataForSimona = SimopsimUtils.createEmSetPoints(inputFromClient, mapping);
-        ExtInputContainer inputDataContainer = new ExtInputContainer(0L);
-        dataForSimona.forEach(inputDataContainer::addSetPoint);
-        queueToSIMONA.queueData(inputDataContainer);
+        ExtInputContainer container = new ExtInputContainer(currentTick);
+        dataForSimona.forEach(container::addSetPoint);
+        inputQueue.queueData(container);
       } catch (InterruptedException e) {
         throw new RuntimeException(e);
       }
 
       // --------------------------------------------------------------------------------------------------
-
       // Trigger SIMONA to provide result
 
       try {
         logger.info("Wait for results from SIMONA!");
         // Wait for results from SIMONA!
-        ExtOutputContainer results = queueToOpSim.takeContainer();
+        ExtOutputContainer results = outputQueue.takeContainer();
         logger.info("Received results from SIMONA!");
 
         logger.debug(
@@ -206,30 +198,41 @@ public final class SimonaProxy extends ConservativeSynchronizedProxy {
     }
   }
 
-  public static DataType getDataType(List<MeasurementValueType> measurementValueTypes) {
-    throw new IllegalArgumentException(
-        "Could not find valid data type from given measurementValueTypes: "
-            + measurementValueTypes);
+  @Override
+  public String getName() {
+    return "SimonaProxy";
   }
 
-  public static DataType getDataType(
-      List<MeasurementValueType> readableMeasurementValueType,
-      List<MeasurementValueType> controlledMeasurementValueTypes) {
+  @Override
+  public void setInitDataQueue(Queue<InitializationData> queue) {
+    this.queue = queue;
+  }
 
-    boolean isEM =
-        readableMeasurementValueType.size() == 1
-            && readableMeasurementValueType.contains(FLEXIBILITY_SCHEDULE)
-            && (controlledMeasurementValueTypes.contains(ACTIVE_POWER)
-                || controlledMeasurementValueTypes.contains(REACTIVE_POWER));
+  @Override
+  public Status getStatus(long simonaTick) throws InterruptedException {
+    long extTick = converter.toSimonaTick(inputQueue.takeData(ExtInputContainer::getTick));
 
-    if (isEM) {
-      return DataType.EM;
+    if (simonaTick == extTick) {
+      return new HasData(inputQueue.takeContainer());
+    } else if (simonaTick < extTick) {
+      return new SimonaIsBehind(extTick);
+    } else {
+      return new SimonaIsAhead();
     }
+  }
 
-    throw new IllegalArgumentException(
-        "Could not find valid data type from given readable measurementValueTypes: "
-            + readableMeasurementValueType
-            + " and controlledMeasurementValueTypes: "
-            + controlledMeasurementValueTypes);
+  @Override
+  public void provideOutputData(ExtOutputContainer extOutputContainer) {
+    try {
+      this.outputQueue.queueData(extOutputContainer);
+      logger.info("Provided OpSim with results.");
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Override
+  public void goToNextTick(long tick) {
+    throw new IllegalStateException("This should not be called");
   }
 }

@@ -24,15 +24,15 @@ import edu.ie3.simona.api.mapping.DataType;
 import edu.ie3.simona.api.mapping.ExtEntityEntry;
 import edu.ie3.simona.api.mapping.ExtEntityMapping;
 import edu.ie3.util.quantities.PowerSystemUnits;
-import java.io.IOException;
-import java.util.*;
-import java.util.function.Consumer;
-import java.util.stream.Collectors;
 import org.apache.logging.slf4j.SLF4JLogger;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import tech.units.indriya.quantity.Quantities;
+
+import java.io.IOException;
+import java.util.*;
+import java.util.function.Consumer;
 
 /** Helpful methods to implement a SIMONA-OPSIM coupling. */
 public class SimopsimUtils {
@@ -164,11 +164,6 @@ public class SimopsimUtils {
 
     if (results.isEmpty()) {
       log.warn("No results received for asset '{}' in tick {}", id, container.getTick());
-    } else {
-      log.warn(
-          "Results for '{}': {}",
-          gridId,
-          results.stream().map(ResultEntity::getInputModel).collect(Collectors.toSet()));
     }
 
     for (MeasurementValueType valueType : asset.getMeasurableQuantities()) {
