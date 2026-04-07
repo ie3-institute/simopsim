@@ -193,7 +193,8 @@ public class SimopsimUtils {
 
   public static List<EmSetPoint> createEmSetPoints(
       Queue<OpSimMessage> inputFromClient, ExtEntityMapping mapping) {
-    List<EmSetPoint> dataForSimona = new ArrayList<>();
+    Map<UUID, EmSetPoint> dataForSimona = new HashMap<>();
+    Set<UUID> filter = new HashSet<>();
 
     inputFromClient.forEach(
         osm -> {
@@ -204,20 +205,29 @@ public class SimopsimUtils {
                 String ossmId = ossm.getAssetId();
                 String id = ossmId.replace("/Schedule", "");
                 UUID uuid = mapping.from(id);
-                log.info("Id: {} ({}) -> UUID: {}", ossmId, id, uuid);
+                log.info("[Active power] Id: {} ({}) -> UUID: {}", ossmId, id, uuid);
 
-                dataForSimona.add(
+                dataForSimona.put(
+                        uuid,
                     new EmSetPoint(
                         uuid,
                         new PValue(
                             Quantities.getQuantity(
                                 ose.getScheduledValue(), StandardUnits.ACTIVE_POWER_IN))));
               }
+
+              if (ose.getScheduledValueType() == SetPointValueType.SWITCH_POSITION) {
+                String ossmId = ossm.getAssetId();
+                String id = ossmId.replace("/Schedule", "");
+                UUID uuid = mapping.from(id);
+                log.info("[Switch position] Id: {} ({}) -> UUID: {}", ossmId, id, uuid);
+                filter.add(uuid);
+              }
             }
           }
         });
 
-    return dataForSimona;
+    return dataForSimona.entrySet().stream().filter(e -> filter.contains(e.getKey())).map(Map.Entry::getValue).toList();
   }
 
   public static List<OpSimAggregatedSetPoints> createSimopsimOutputList(

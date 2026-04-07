@@ -95,11 +95,12 @@ public final class OpsimSimulation extends ExtCoSimulation<InitializationData> {
   }
 
   @Override
-  public ExtOutputContainer handleNoExternalData(long tick) {
+  public ExtOutputContainer handleNoExternalData(long tick) throws InterruptedException {
     extEmDataConnection.simulateInternal(tick);
     log.info("Simulate internal for tick: {}", tick);
+    OptionalLong nextEmTick = extEmDataConnection.receiveWithType(EmCompletion.class).maybeNextTick();
 
-    return null;
+    return new ExtOutputContainer(tick, getNextTickOption(OptionalLong.of(tick), nextEmTick));
   }
 
   @Override

@@ -53,7 +53,7 @@ dependencies {
 
   // opsim dependencies
   implementation files('libs/iee-opsim-datamodel-3.3.8.jar')
-  implementation files('libs/iee-opsim-client-2.2.24-SNAPSHOT-jar-with-dependencies.jar')
+  implementation files('libs/iee-opsim-client-2.2.26-SNAPSHOT-jar-with-dependencies.jar')
 
 
   /* config */
