@@ -13,7 +13,7 @@ import edu.ie3.simona.api.data.connection.ExtEmDataConnection.EmMode;
 import edu.ie3.simona.api.data.connection.ExtResultDataConnection;
 import edu.ie3.simona.api.data.container.ExtInputContainer;
 import edu.ie3.simona.api.data.container.ExtOutputContainer;
-import edu.ie3.simona.api.data.model.em.EmSetPoint;
+import edu.ie3.simona.api.data.model.em.SetPoint;
 import edu.ie3.simona.api.mapping.DataType;
 import edu.ie3.simona.api.mapping.ExtEntityMapping;
 import edu.ie3.simona.api.ontology.em.EmCompletion;
@@ -74,7 +74,7 @@ public final class OpsimSimulation extends ExtCoSimulation<InitializationData> {
     OptionalLong maybeNextTick = OptionalLong.of(nextTick);
 
     log.info("Get data from OpSim.");
-    Map<UUID, EmSetPoint> emSetPoints = inputData.extractSetPoints();
+    Map<UUID, SetPoint> emSetPoints = inputData.extractSetPoints();
 
     log.info("Sending em set points to SIMONA.");
     extEmDataConnection.sendEmData(tick, emSetPoints, log);

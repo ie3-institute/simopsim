@@ -19,7 +19,7 @@ import edu.ie3.datamodel.models.result.ResultEntity;
 import edu.ie3.datamodel.models.result.system.SystemParticipantResult;
 import edu.ie3.datamodel.models.value.PValue;
 import edu.ie3.simona.api.data.container.ExtOutputContainer;
-import edu.ie3.simona.api.data.model.em.EmSetPoint;
+import edu.ie3.simona.api.data.model.em.SetPoint;
 import edu.ie3.simona.api.mapping.DataType;
 import edu.ie3.simona.api.mapping.ExtEntityEntry;
 import edu.ie3.simona.api.mapping.ExtEntityMapping;
@@ -191,9 +191,9 @@ public class SimopsimUtils {
     return new OpSimAggregatedSetPoints(gridId, delta, osmSetPoints);
   }
 
-  public static List<EmSetPoint> createEmSetPoints(
+  public static List<SetPoint> createEmSetPoints(
       Queue<OpSimMessage> inputFromClient, ExtEntityMapping mapping) {
-    Map<UUID, EmSetPoint> dataForSimona = new HashMap<>();
+    Map<UUID, SetPoint> dataForSimona = new HashMap<>();
     Set<UUID> filter = new HashSet<>();
 
     inputFromClient.forEach(
@@ -209,7 +209,7 @@ public class SimopsimUtils {
 
                 dataForSimona.put(
                         uuid,
-                    new EmSetPoint(
+                    new SetPoint.AggregatedSetPoint(
                         uuid,
                         new PValue(
                             Quantities.getQuantity(

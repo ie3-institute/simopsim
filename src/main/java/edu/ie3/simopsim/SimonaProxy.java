@@ -18,7 +18,7 @@ import de.fhg.iwes.opsim.datamodel.generated.scenarioconfig.ScenarioConfig;
 import edu.ie3.simona.api.data.ExtDataContainerQueue;
 import edu.ie3.simona.api.data.container.ExtInputContainer;
 import edu.ie3.simona.api.data.container.ExtOutputContainer;
-import edu.ie3.simona.api.data.model.em.EmSetPoint;
+import edu.ie3.simona.api.data.model.em.SetPoint;
 import edu.ie3.simona.api.mapping.ExtEntityMapping;
 import edu.ie3.simona.api.simulation.ExtCoSimFramework;
 import java.util.*;
@@ -128,8 +128,8 @@ public final class SimonaProxy extends ConservativeSynchronizedProxy
 
       try {
         logger.info("Received messages for {}", this.cli.getCurrentSimulationTime().toString());
-        List<EmSetPoint> dataForSimona = SimopsimUtils.createEmSetPoints(inputFromClient, mapping);
-        ExtInputContainer container = new ExtInputContainer(currentTick);
+        List<SetPoint> dataForSimona = SimopsimUtils.createEmSetPoints(inputFromClient, mapping);
+        ExtInputContainer container = new ExtInputContainer(converter.toSimonaTick(currentTick));
         dataForSimona.forEach(container::addSetPoint);
         inputQueue.queueData(container);
       } catch (InterruptedException e) {
