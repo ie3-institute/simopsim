@@ -210,7 +210,7 @@ public final class SimonaProxy extends ConservativeSynchronizedProxy
 
   @Override
   public Status getStatus(long simonaTick) throws InterruptedException {
-    long extTick = converter.toSimonaTick(inputQueue.takeData(ExtInputContainer::getTick));
+    long extTick = inputQueue.takeData(ExtInputContainer::getTick);
 
     if (simonaTick == extTick) {
       return new HasData(inputQueue.takeContainer());
@@ -233,7 +233,6 @@ public final class SimonaProxy extends ConservativeSynchronizedProxy
 
   @Override
   public void goToNextTick(long simonaTick) {
-    // provide empty output to tell OpSim to go to the next tick
-    provideOutputData(new ExtOutputContainer(simonaTick, OptionalLong.of(simonaTick)));
+    throw new IllegalStateException("This should not be called");
   }
 }
