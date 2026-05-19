@@ -24,15 +24,14 @@ import edu.ie3.simona.api.mapping.DataType;
 import edu.ie3.simona.api.mapping.ExtEntityEntry;
 import edu.ie3.simona.api.mapping.ExtEntityMapping;
 import edu.ie3.util.quantities.PowerSystemUnits;
+import java.io.IOException;
+import java.util.*;
+import java.util.function.Consumer;
 import org.apache.logging.slf4j.SLF4JLogger;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import tech.units.indriya.quantity.Quantities;
-
-import java.io.IOException;
-import java.util.*;
-import java.util.function.Consumer;
 
 /** Helpful methods to implement a SIMONA-OPSIM coupling. */
 public class SimopsimUtils {
@@ -208,7 +207,7 @@ public class SimopsimUtils {
                 log.info("[Active power] Id: {} ({}) -> UUID: {}", ossmId, id, uuid);
 
                 dataForSimona.put(
-                        uuid,
+                    uuid,
                     new SetPoint.AggregatedSetPoint(
                         uuid,
                         new PValue(
@@ -227,7 +226,10 @@ public class SimopsimUtils {
           }
         });
 
-    return dataForSimona.entrySet().stream().filter(e -> filter.contains(e.getKey())).map(Map.Entry::getValue).toList();
+    return dataForSimona.entrySet().stream()
+        .filter(e -> filter.contains(e.getKey()))
+        .map(Map.Entry::getValue)
+        .toList();
   }
 
   public static List<OpSimAggregatedSetPoints> createSimopsimOutputList(

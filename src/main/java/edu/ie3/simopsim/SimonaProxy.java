@@ -232,7 +232,8 @@ public final class SimonaProxy extends ConservativeSynchronizedProxy
   }
 
   @Override
-  public void goToNextTick(long tick) {
-    throw new IllegalStateException("This should not be called");
+  public void goToNextTick(long simonaTick) {
+    // provide empty output to tell OpSim to go to the next tick
+    provideOutputData(new ExtOutputContainer(simonaTick, OptionalLong.of(simonaTick)));
   }
 }
